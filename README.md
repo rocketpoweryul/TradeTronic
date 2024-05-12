@@ -20,9 +20,9 @@
 - Ensure dataframes are usable for a machine learning basis later on
 
 ## Modules:
-TATools.py: Contains all the functions for accessing an manipulating stock data
-GUI.py: Renders the bokeh html
-y_SysInt_Tests.py: My sandbox to try the above modules
+- TATools.py: Contains all the functions for accessing and manipulating stock data
+- GUI.py: Renders the bokeh html
+- y_SysInt_Tests.py: My sandbox to try the above modules
 
 See modules for functional summaries.
 
