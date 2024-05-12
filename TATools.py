@@ -151,19 +151,23 @@ def filter_peaks(df):
         prev_swing_high_price = df.loc[swing_highs[i-1], 'High']
         curr_swing_high_price = df.loc[swing_highs[i  ], 'High']
         next_swing_high_price = df.loc[swing_highs[i+1], 'High']
+        next_swing_low_price  = df.loc[swing_lows[i+1],  'Low' ]
         
         # detect positive peak
-        if ( curr_swing_high_price > prev_swing_high_price ) and ( curr_swing_high_price > next_swing_high_price ):
+        if ( curr_swing_high_price > prev_swing_high_price ) and \
+           ( curr_swing_high_price > next_swing_high_price or prev_swing_high_price > next_swing_low_price):
             df.loc[swing_highs[i], 'Peak'] = 1
             
     # loop through swing lows, starting at the second occurrence and ending at 2nd last occurrence given the rules
     for i in range( 1, len(swing_lows) - 1 ):
-        prev_swing_low_price = df.loc[swing_lows[i-1], 'Low']
-        curr_swing_low_price = df.loc[swing_lows[i  ], 'Low']
-        next_swing_low_price = df.loc[swing_lows[i+1], 'Low']
+        prev_swing_low_price  = df.loc[swing_lows[i-1], 'Low' ]
+        curr_swing_low_price  = df.loc[swing_lows[i  ], 'Low' ]
+        next_swing_low_price  = df.loc[swing_lows[i+1], 'Low' ]
+        next_swing_high_price = df.loc[swing_highs[i+1], 'High']
         
         # detect negative peak
-        if ( curr_swing_low_price < prev_swing_low_price ) and ( curr_swing_low_price < next_swing_low_price ):
+        if ( curr_swing_low_price < prev_swing_low_price ) and \
+           ( curr_swing_low_price < next_swing_low_price or prev_swing_low_price < next_swing_high_price):
             df.loc[swing_lows[i], 'Peak'] = -1
             
     return df    
@@ -211,7 +215,7 @@ def detect_consolidation(df, consol_min_bars=20, consol_mindepth_pct=5, consol_m
             # this is done by inspecting peaks previous to the current row
 
             # Create List of Filtered Peaks
-            peaks = df[(df['Peak'] == 1) & (df.index < index) & (df['High'] > row['High']) ]#& (df['Peak'].shift(1) < df['Peak']) & (df['Peak'].shift(-1) < df['Peak'])]
+            peaks = df[(df['Peak'] == 1) & (df.index < index) & (df['High'] > row['High']) ]
 
             # Skip loop iteration if there are no peaks
             if peaks.empty:
