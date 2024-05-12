@@ -23,19 +23,28 @@ def find_swing_high_and_lows(df):
     if df.shape[0] < 3:
         raise ValueError("DataFrame must contain at least 3 rows of data")
     
-    df = df.copy()  # Make a copy to avoid modifying the original DataFrame
+    #df = df.copy()  # Make a copy to avoid modifying the original DataFrame
     
     df['SwHL'] = 0
 
     for i in range(1, len(df) - 1):
-        is_swing_high = df['High'].iloc[i] > df['High'].iloc[i + 1] and df['High'].iloc[i] > df['High'].iloc[i - 1]
-        is_swing_low = df['Low'].iloc[i] < df['Low'].iloc[i + 1] and df['Low'].iloc[i] < df['Low'].iloc[i - 1]
+        # determine current high and low values
+        curr_high = df['High'].iloc[i    ]
+        next_high = df['High'].iloc[i + 1]
+        prev_high = df['High'].iloc[i - 1]
+        
+        curr_low = df['Low'].iloc[i    ]
+        next_low = df['Low'].iloc[i + 1]
+        prev_low = df['Low'].iloc[i - 1]
 
-        # Check for outside day condition
-        if is_swing_high and is_swing_low:
-            # Neutralize the signal for outside days
-            df.at[df.index[i], 'SwHL'] = 0
-        elif is_swing_high:
+        # detect swing high
+        is_swing_high = curr_high > next_high and curr_high > prev_high
+
+        # detect swing low
+        is_swing_low = curr_low < next_low and curr_low < prev_low
+
+        # add detection results to dataframe
+        if is_swing_high:
             df.at[df.index[i], 'SwHL'] = 1
         elif is_swing_low:
             df.at[df.index[i], 'SwHL'] = -1
@@ -151,23 +160,32 @@ def filter_peaks(df):
         prev_swing_high_price = df.loc[swing_highs[i-1], 'High']
         curr_swing_high_price = df.loc[swing_highs[i  ], 'High']
         next_swing_high_price = df.loc[swing_highs[i+1], 'High']
-        next_swing_low_price  = df.loc[swing_lows[i+1],  'Low' ]
+        
+        # Find the index of the next swing low after the current swing high
+        next_swing_low_indices = [low for low in swing_lows if low > swing_highs[i]]
+        next_swing_low_price = df.loc[next_swing_low_indices[0], 'Low'] if next_swing_low_indices else None
         
         # detect positive peak
-        if ( curr_swing_high_price > prev_swing_high_price ) and \
-           ( curr_swing_high_price > next_swing_high_price or prev_swing_high_price > next_swing_low_price):
+         # Detect positive peak
+        if curr_swing_high_price > prev_swing_high_price and \
+          (curr_swing_high_price > next_swing_high_price or  \
+           (next_swing_low_price is not None and prev_swing_high_price > next_swing_low_price)):
             df.loc[swing_highs[i], 'Peak'] = 1
             
     # loop through swing lows, starting at the second occurrence and ending at 2nd last occurrence given the rules
     for i in range( 1, len(swing_lows) - 1 ):
-        prev_swing_low_price  = df.loc[swing_lows[i-1], 'Low' ]
-        curr_swing_low_price  = df.loc[swing_lows[i  ], 'Low' ]
-        next_swing_low_price  = df.loc[swing_lows[i+1], 'Low' ]
-        next_swing_high_price = df.loc[swing_highs[i+1], 'High']
+        prev_swing_low_price  = df.loc[swing_lows[ i-1], 'Low' ]
+        curr_swing_low_price  = df.loc[swing_lows[ i  ], 'Low' ]
+        next_swing_low_price  = df.loc[swing_lows[ i+1], 'Low' ]
         
-        # detect negative peak
-        if ( curr_swing_low_price < prev_swing_low_price ) and \
-           ( curr_swing_low_price < next_swing_low_price or prev_swing_low_price < next_swing_high_price):
+        # find the index of the next swing high after the current swing low
+        next_swing_high_indices = [high for high in swing_highs if high > swing_lows[i]]
+        next_swing_high_price = df.loc[next_swing_high_indices[0], 'High'] if next_swing_high_indices else None
+
+        # Detect negative peak
+        if curr_swing_low_price < prev_swing_low_price and \
+           (curr_swing_low_price < next_swing_low_price or \
+            (next_swing_high_price is not None and prev_swing_low_price < next_swing_high_price)):
             df.loc[swing_lows[i], 'Peak'] = -1
             
     return df    
