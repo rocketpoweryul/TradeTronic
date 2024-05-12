@@ -1,4 +1,8 @@
+# open source modules
 import pandas as pd
+
+# internal modules
+from    NorgateInterface import *
 
 def find_swing_high_and_lows(df):
     """
@@ -392,3 +396,39 @@ def add_moving_average(df, num_bars=21, MA_type='EMA', price='Close'):
     df[ma_name] = ma
 
     return df
+
+def add_relative_strength_line(df, index="S&P500", new_high_bars=69):
+    # Ensure df.index is a DatetimeIndex for proper diff calculation
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError("Index of df must be a pandas DatetimeIndex.")
+
+    # Determine period of input stock data in df
+    date_diff = df.index.to_series().diff().dt.days
+    min_date_diff = date_diff.min()
+    
+    # Map minimum date difference to interval
+    if min_date_diff == 1:
+        interval = 'D'
+    elif min_date_diff == 7:
+        interval = 'W'
+    elif min_date_diff >= 30:
+        interval = 'M'
+    else:
+        raise ValueError("Invalid frequency: {}. Please choose daily (1 day), weekly (7 days), or monthly (30+ days).".format(min_date_diff))
+
+    # Get the index symbol based on the input
+    index_symbol_map = {"S&P500": "$SPX", "NASDAQ": "$COMP", "DJIA": "$DJI"}
+    index_symbol = index_symbol_map.get(index)
+    if index_symbol is None:
+        raise ValueError("Invalid index specified: '{}'. Please choose from S&P500, NASDAQ, or DJIA.".format(index))
+
+    # Fetch OHLCV data for the index
+    index_df = fetch_OHLCV(symbol=index_symbol, numbars=len(df), interval=interval)
+
+    # Update the dataframe with RSL and RSL new high data
+    df['RSL'] = df['Close'] / index_df['Close']
+    # Calculate new highs over the specified period using a rolling window
+    df['RSL_NH'] = df['RSL'] > df['RSL'].rolling(window=new_high_bars, min_periods=new_high_bars).max().shift(1)
+
+    return df
+

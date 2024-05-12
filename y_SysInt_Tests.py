@@ -1,9 +1,9 @@
 # open source modules
-from    NorgateInterface import *
 import  pandas as pd
 import  os
 
 # functions from this project
+from    NorgateInterface import *
 from    TATools          import *
 from    GUI              import *
 
@@ -18,9 +18,7 @@ pd.set_option('display.width',          2000)
 # get the data from Norgate
 df = fetch_OHLCV(symbol          = 'MMYT', 
                  numbars         = 500, 
-                 interval        = 'D', 
-                 price_adjust    = norgatedata.StockPriceAdjustmentType.TOTALRETURN, 
-                 padding         = norgatedata.PaddingType.NONE)
+                 interval        = 'D')
 
 ## Initial stock dataframe processeing
 df = find_swing_high_and_lows(df)
@@ -31,6 +29,8 @@ df = add_moving_average(df,  21, 'ema')
 df = add_moving_average(df,  50, 'sma')
 df = add_moving_average(df, 150, 'sma')
 df = add_moving_average(df, 200, 'sma')
+sf = add_relative_strength_line(df)
+
 
 # Convert index to integers, but save dates as datestrings 
 df['DateString'] = df.index.strftime('%Y-%m-%d')  # Save date info before resetting index
