@@ -93,10 +93,8 @@ def Launch_GUI(df):
     p.vbar('index', width=0.7, top='Open', bottom='Close', fill_color='color', line_color='color', source=source)
 
     # Add arrows for swing high low
-    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black",
-                       x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_SwHL))
-    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black",
-                       x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_SwHL))
+    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_SwHL))
+    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_SwHL))
 
     # Add arrows for up and down peaks
     p.add_layout(Arrow(end=VeeHead(size=14), line_color="orange",
