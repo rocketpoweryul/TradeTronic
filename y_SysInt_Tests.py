@@ -16,7 +16,7 @@ pd.set_option('display.max_columns',    100)
 pd.set_option('display.width',          2000)
 
 # get the data from Norgate
-df = fetch_OHLCV(symbol          = 'DELL', 
+df = fetch_OHLCV(symbol          = 'MMYT', 
                  numbars         = 500, 
                  interval        = 'D', 
                  price_adjust    = norgatedata.StockPriceAdjustmentType.TOTALRETURN, 
@@ -24,7 +24,7 @@ df = fetch_OHLCV(symbol          = 'DELL',
 
 ## Initial stock dataframe processeing
 df = find_swing_high_and_lows(df)
-df = filter_swing_high_and_lows(df)
+#df = filter_swing_high_and_lows(df)
 df = filter_peaks(df)
 df = detect_consolidation(df)
 df = add_moving_average(df,  21, 'ema')
