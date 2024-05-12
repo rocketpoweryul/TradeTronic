@@ -126,7 +126,10 @@ def Launch_GUI(df):
     start_indices = start_indices[:len(end_indices)]
 
     for end in end_indices:
-        right_side = end - 1  # Find the last bar where Consol_Detected is True
+        if end == df.index[-1]:
+            right_side = end      # If the last bar is the right side, include it.
+        else:    
+            right_side = end - 1  # Find the last bar where Consol_Detected is True
         left_side = right_side - df.loc[right_side, 'Consol_Len_Bars'] - 1
         top_side = df.loc[right_side, 'Consol_LHS_Price']
         bottom_side = top_side - (top_side * df.loc[right_side, 'Consol_Depth_Percent'] / 100)

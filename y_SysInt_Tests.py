@@ -24,7 +24,7 @@ df = fetch_OHLCV(symbol          = 'MMYT',
 
 ## Initial stock dataframe processeing
 df = find_swing_high_and_lows(df)
-#df = filter_swing_high_and_lows(df)
+df = filter_swing_high_and_lows(df)
 df = filter_peaks(df)
 df = detect_consolidation(df)
 df = add_moving_average(df,  21, 'ema')
