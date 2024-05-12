@@ -103,3 +103,8 @@ Desktop.ini
 
 # Linux specific
 .directory
+
+# custom
+y_SysInt_Tests.html
+df.csv
+df.xlsx

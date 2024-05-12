@@ -93,57 +93,64 @@ def Launch_GUI(df):
     p.vbar('index', width=0.7, top='Open', bottom='Close', fill_color='color', line_color='color', source=source)
 
     # Add arrows for swing high low
-    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_SwHL))
-    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_SwHL))
+    if 'SwHL' in df.columns and df['SwHL'].notna().any():
+        p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_SwHL))
+        p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_SwHL))
 
-    # Add arrows for up and down peaks
-    p.add_layout(Arrow(end=VeeHead(size=14), line_color="orange",
-                       x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_Peaks))
-    p.add_layout(Arrow(end=VeeHead(size=14), line_color="orange",
-                       x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_Peaks))
+    # Add arrows for up and down 
+    if 'Peak' in df.columns and df['Peak'].notna().any():
+        p.add_layout(Arrow(end=VeeHead(size=14), 
+                     line_color="orange",
+                     x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', 
+                     source=up_source_Peaks))
+        p.add_layout(Arrow(end=VeeHead(size=14), 
+                     line_color="orange",
+                     x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', 
+                     source=down_source_Peaks))
     
-    # Add labels for high prices at peaks
-    for idx, high, adj_high in zip(up_source_Peaks.data['index'], up_source_Peaks.data['High'], up_source_Peaks.data['ArrowTail']):
-        formatted_high = "${:0.2f}".format(high)  # Format the price
-        price_label = Label(x=idx, y=adj_high, text=formatted_high, text_font_size="8pt", text_color="green",
-                            text_baseline="bottom", text_align="center")
-        p.add_layout(price_label)
+        # Add labels for high prices at peaks
+        for idx, high, adj_high in zip(up_source_Peaks.data['index'], up_source_Peaks.data['High'], up_source_Peaks.data['ArrowTail']):
+            formatted_high = "${:0.2f}".format(high)  # Format the price
+            price_label = Label(x=idx, y=adj_high, text=formatted_high, text_font_size="8pt", text_color="green",
+                                text_baseline="bottom", text_align="center")
+            p.add_layout(price_label)
 
-    # Add labels for low prices at troughs
-    for idx, low, adj_low in zip(down_source_Peaks.data['index'], down_source_Peaks.data['Low'], down_source_Peaks.data['ArrowTail']):
-        formatted_low = "${:0.2f}".format(low)  # Format the price
-        price_label = Label(x=idx, y=adj_low, text=formatted_low, text_font_size="8pt", text_color="red",
-                            text_baseline="top", text_align="center")
-        p.add_layout(price_label)
+        # Add labels for low prices at troughs
+        for idx, low, adj_low in zip(down_source_Peaks.data['index'], down_source_Peaks.data['Low'], down_source_Peaks.data['ArrowTail']):
+            formatted_low = "${:0.2f}".format(low)  # Format the price
+            price_label = Label(x=idx, y=adj_low, text=formatted_low, text_font_size="8pt", text_color="red",
+                                text_baseline="top", text_align="center")
+            p.add_layout(price_label)
 
     # Draw rectangles for consolidation detection
-    change = df['Consol_Detected'].astype(int).diff().fillna(0) != 0
-    start_indices = df.index[change & (df['Consol_Detected'])].tolist()
-    # Check if the last value of 'Consol_Detected' is True, if so append the last index to end_indices
-    end_indices = df.index[change & (~df['Consol_Detected'])].tolist() + [df.index[-1]]  # Append the last index if the last segment is True
+    if 'Consol_Detected' in df.columns and df['Consol_Detected'].notna().any():
+        change = df['Consol_Detected'].astype(int).diff().fillna(0) != 0
+        start_indices = df.index[change & (df['Consol_Detected'])].tolist()
+        # Check if the last value of 'Consol_Detected' is True, if so append the last index to end_indices
+        end_indices = df.index[change & (~df['Consol_Detected'])].tolist() + [df.index[-1]]  # Append the last index if the last segment is True
 
-    # Ensure each start has an end
-    start_indices = start_indices[:len(end_indices)]
+        # Ensure each start has an end
+        start_indices = start_indices[:len(end_indices)]
 
-    for end in end_indices:
-        if end == df.index[-1]:
-            right_side = end      # If the last bar is the right side, include it.
-        else:    
-            right_side = end - 1  # Find the last bar where Consol_Detected is True
-        left_side = right_side - df.loc[right_side, 'Consol_Len_Bars'] - 1
-        top_side = df.loc[right_side, 'Consol_LHS_Price']
-        bottom_side = top_side - (top_side * df.loc[right_side, 'Consol_Depth_Percent'] / 100)
-        box = BoxAnnotation(left=left_side, right=right_side, top=top_side, bottom=bottom_side, fill_alpha=0.4, fill_color='orange')
+        for end in end_indices:
+            if end == df.index[-1]:
+                right_side = end      # If the last bar is the right side, include it.
+            else:    
+                right_side = end - 1  # Find the last bar where Consol_Detected is True
+            left_side = right_side - df.loc[right_side, 'Consol_Len_Bars'] - 1
+            top_side = df.loc[right_side, 'Consol_LHS_Price']
+            bottom_side = top_side - (top_side * df.loc[right_side, 'Consol_Depth_Percent'] / 100)
+            box = BoxAnnotation(left=left_side, right=right_side, top=top_side, bottom=bottom_side, fill_alpha=0.4, fill_color='orange')
 
-        print(f"Left Side Index: {left_side}")
-        print(f"Right Side Index: {right_side}")
-        print(f"Consol_LHS_Price at {right_side}: {df.loc[right_side, 'Consol_LHS_Price']}")
-        print(f"Consol_Depth_Percent at {right_side}: {df.loc[right_side, 'Consol_Depth_Percent']}")
-        print(f"Top Side: {top_side}, Bottom Side: {bottom_side}")
-        print(f"End Index: {end}\n")
+            print(f"Left Side Index: {left_side}")
+            print(f"Right Side Index: {right_side}")
+            print(f"Consol_LHS_Price at {right_side}: {df.loc[right_side, 'Consol_LHS_Price']}")
+            print(f"Consol_Depth_Percent at {right_side}: {df.loc[right_side, 'Consol_Depth_Percent']}")
+            print(f"Top Side: {top_side}, Bottom Side: {bottom_side}")
+            print(f"End Index: {end}\n")
 
 
-        p.add_layout(box)
+            p.add_layout(box)
 
     # Plot SMAs and EMAs
     if 'Close_21_bar_ema' in df.columns and df['Close_21_bar_ema'].notna().any():
@@ -154,6 +161,35 @@ def Launch_GUI(df):
         p.line(df.index, df['Close_150_bar_sma'], line_width=2, color='blue', legend_label='150-day SMA')
     if 'Close_200_bar_sma' in df.columns and df['Close_200_bar_sma'].notna().any():
         p.line(df.index, df['Close_200_bar_sma'], line_width=3, color='black', legend_label='200-day SMA')
+    
+    # Handle RSL and its scaling
+    if 'RSL' in df.columns and df['RSL'].notna().any():
+        last_low = df['Low'].iloc[-1]
+        last_rsl = df['RSL'].iloc[-1]
+        desired_rsl_position = last_low * 0.8
+        rsl_scale_factor = desired_rsl_position / last_rsl
+        scaled_rsl = df['RSL'] * rsl_scale_factor
+        p.line(df.index, scaled_rsl, line_width=1, color='blue', legend_label='RSL')
+
+    # Plotting dots at RSL New Highs using scatter, with color conditional on Consol_Detected
+    if 'RSL_NH' in df.columns and df['RSL_NH'].any():
+        # Extract indices and values where RSL_NH is true
+        nh_indices = df.index[df['RSL_NH']].tolist()
+        nh_values = scaled_rsl[df['RSL_NH']]
+
+        # Determine color based on Consol_Detected
+        colors = ['cyan' if consol else 'lightblue' for consol in df.loc[df['RSL_NH'], 'Consol_Detected']]
+
+        size = [10 if consol else 7 for consol in df.loc[df['RSL_NH'], 'Consol_Detected']]
+
+        nh_source = ColumnDataSource(data={
+            'x': nh_indices,
+            'y': nh_values,
+            'color': colors,  # Adding a color field to the data source
+            'size': size
+        })
+        p.scatter('x', 'y', size='size', color='color', alpha=0.8, source=nh_source)  # Use the color field for the color property
+
 
     # Custom x-axis configuration
     p.add_layout(LinearAxis(), 'below')
