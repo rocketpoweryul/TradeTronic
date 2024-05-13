@@ -1,9 +1,6 @@
+![Tradetronic](https://github.com/rocketpoweryul/TradeTronic/assets/5898307/6f95adc8-e001-4ca7-8c9c-63b1421ad236)
 
-![image](https://github.com/rocketpoweryul/TradeTronic/assets/5898307/8c08a673-a8f4-45ac-86ed-fc701138c7f6)
-
-
-
-# TradeTronic
+# Tradetronic
 
 ## Goals:
 
