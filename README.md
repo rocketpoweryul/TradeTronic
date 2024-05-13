@@ -1,5 +1,6 @@
 
-![DMT New Logo 2024 no bk_25pct](https://github.com/rocketpoweryul/TradeTronic/assets/5898307/ff5b65ec-8569-4566-80a1-b4c9ca60dfa9)
+![image](https://github.com/rocketpoweryul/TradeTronic/assets/5898307/8c08a673-a8f4-45ac-86ed-fc701138c7f6)
+
 
 
 # TradeTronic
