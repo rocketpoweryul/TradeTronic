@@ -1,5 +1,11 @@
 # open source modules
 import pandas as pd
+import numpy as np
+from scipy.stats import linregress, rankdata
+import tqdm
+import concurrent.futures
+import time
+from numba import jit
 
 # internal modules
 from    NorgateInterface import *
@@ -398,10 +404,42 @@ def add_moving_average(df, num_bars=21, MA_type='EMA', price='Close'):
     return df
 
 def add_relative_strength_line(df, index="S&P500", new_high_bars=69):
-    # Ensure df.index is a DatetimeIndex for proper diff calculation
-    if not isinstance(df.index, pd.DatetimeIndex):
-        raise TypeError("Index of df must be a pandas DatetimeIndex.")
+    """
+    Adds a relative strength line (RSL) and a new high column to a pandas DataFrame.
 
+    Parameters:
+        df (pandas.DataFrame): A pandas DataFrame containing at least a 'Close' column
+            with stock prices and a DatetimeIndex.
+        index (str, optional): The market index to use for calculating relative strength.
+            Can be 'S&P500', 'NASDAQ', or 'DJIA'. Defaults to 'S&P500'.
+        new_high_bars (int, optional): The number of bars to use for calculating new highs
+            in the RSL. Defaults to 69.
+
+    Returns:
+        pandas.DataFrame: The input DataFrame with additional columns for the relative
+            strength line and new highs.
+
+    Raises:
+        ValueError: If
+            - The input DataFrame is empty.
+            - The input DataFrame does not have a DatetimeIndex.
+            - The input DataFrame does not have a 'Close' column.
+            - The specified index is not supported.
+            - The frequency of the DataFrame index is not daily, weekly, or monthly.
+    """
+    
+    # Check if the dataframe is not empty
+    if df.empty:
+        raise ValueError("The input dataframe is empty.")
+    
+    # Check if the dataframe has a DatetimeIndex
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise ValueError("Index of df must be a pandas DatetimeIndex.")
+    
+    # Check if the 'Close' column exists in the dataframe
+    if 'Close' not in df.columns:
+        raise ValueError("The dataframe must contain a 'Close' column.")
+    
     # Determine period of input stock data in df
     date_diff = df.index.to_series().diff().dt.days
     min_date_diff = date_diff.min()
@@ -415,20 +453,189 @@ def add_relative_strength_line(df, index="S&P500", new_high_bars=69):
         interval = 'M'
     else:
         raise ValueError("Invalid frequency: {}. Please choose daily (1 day), weekly (7 days), or monthly (30+ days).".format(min_date_diff))
-
+    
     # Get the index symbol based on the input
     index_symbol_map = {"S&P500": "$SPX", "NASDAQ": "$COMP", "DJIA": "$DJI"}
     index_symbol = index_symbol_map.get(index)
     if index_symbol is None:
         raise ValueError("Invalid index specified: '{}'. Please choose from S&P500, NASDAQ, or DJIA.".format(index))
-
+    
     # Fetch OHLCV data for the index
-    index_df = fetch_OHLCV(symbol=index_symbol, numbars=len(df), interval=interval)
-
+    index_df = fetch_OHLCV(index_symbol, len(df), interval=interval)
+    
+    # Check if the fetched index dataframe is not empty and contains a 'Close' column
+    if index_df.empty or 'Close' not in index_df.columns:
+        raise ValueError(f"Failed to fetch valid OHLCV data for index '{index}'.")
+    
     # Update the dataframe with RSL and RSL new high data
     df['RSL'] = df['Close'] / index_df['Close']
     # Calculate new highs over the specified period using a rolling window
     df['RSL_NH'] = df['RSL'] > df['RSL'].rolling(window=new_high_bars, min_periods=new_high_bars).max().shift(1)
-
+    
     return df
 
+@jit(nopython=True)
+def compute_slopes(close_prices, num_bars):
+    """
+    Computes the slopes of linear regressions on rolling windows of closing prices.
+
+    Parameters:
+        close_prices (numpy.ndarray): Array of closing prices.
+        num_bars (int): Number of bars in each rolling window.
+
+    Returns:
+        numpy.ndarray: Array of computed slopes.
+    """
+    total_bars = len(close_prices)
+    num_bars_to_use = min(num_bars, total_bars)
+    
+    x = np.arange(num_bars_to_use)
+    x_mean = np.mean(x)
+    slopes = np.empty(total_bars - num_bars_to_use + 1)
+
+    for i in range(num_bars_to_use, total_bars + 1):
+        y = close_prices[i - num_bars_to_use:i]
+        y_mean = np.mean(y)
+        slope = np.sum((x - x_mean) * (y - y_mean)) / np.sum((x - x_mean) ** 2)
+        slopes[i - num_bars_to_use] = slope
+    
+    return slopes
+
+def compute_slope_for_symbol(symbol, num_bars):
+    """
+    Fetches OHLCV data for a symbol, computes the slopes of linear regressions
+    on rolling windows of closing prices, and measures the time taken for each step.
+
+    Parameters:
+        symbol (str): The ticker symbol for which to compute the slopes.
+        num_bars (int): Number of bars in each rolling window.
+
+    Returns:
+        tuple: (symbol, slope_series, fetch_duration, regression_duration)
+            - symbol (str): The ticker symbol.
+            - slope_series (pandas.Series): Series of computed slopes.
+            - fetch_duration (float): Time taken to fetch the data.
+            - regression_duration (float): Time taken to compute the slopes.
+    """
+    try:
+        # Fetch data
+        start_fetch = time.time()
+        df = fetch_OHLCV(symbol=symbol, num_bars=None, interval='D')
+        fetch_duration = time.time() - start_fetch
+
+        # Check if data fetching was successful
+        if df.empty:
+            print(f"\nWarning: Empty DF. {symbol}")
+            return symbol, None, fetch_duration, 0
+
+        # Adjust num_bars for recent IPOs
+        if len(df) < num_bars:
+            num_bars = len(df)
+
+        # Compute slopes
+        start_regression = time.time()
+        slopes = compute_slopes(df['Close'].values, num_bars)
+        if len(slopes) == 0:
+            print(f"Error processing symbol {symbol}: No slopes calculated")
+            return symbol, None, fetch_duration, time.time() - start_regression
+        
+        slope_series = pd.Series(slopes, index=df.index[num_bars-1:])
+        regression_duration = time.time() - start_regression
+
+        return symbol, slope_series, fetch_duration, regression_duration
+    except ZeroDivisionError:
+        print(f"Error processing symbol {symbol}: division by zero")
+        return symbol, None, 0, 0
+    except ValueError as ve:
+        print(f"Error processing symbol {symbol}: {ve}")
+        return symbol, None, 0, 0
+    except Exception as e:
+        print(f"Error processing symbol {symbol}: {e}")
+        return symbol, None, 0, 0
+
+def Compute_Rel_Strength_LR(symbol_list, num_bars=252):
+    """
+    Computes the Relative Strength (RS) of each symbol in the provided list using linear regression slopes.
+
+    Parameters:
+        symbol_list (list of str): List of ticker symbols as strings.
+        num_bars (int, optional): Number of bars in each rolling window for regression. Defaults to 252.
+
+    Returns:
+        pandas.DataFrame: DataFrame containing the percentile ranks of the linear regression slopes for each symbol.
+    """
+    slope_dict = {}
+    fetch_times = []
+    regression_times = []
+
+    # Concurrently compute slopes for each symbol
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(compute_slope_for_symbol, symbol, num_bars): symbol for symbol in symbol_list}
+        for future in tqdm(concurrent.futures.as_completed(futures), total=len(symbol_list), desc='Processing symbols'):
+            symbol, slope_series, fetch_duration, regression_duration = future.result()
+            fetch_times.append(fetch_duration)
+            regression_times.append(regression_duration)
+            if slope_series is not None:
+                slope_dict[symbol] = slope_series
+
+    if not slope_dict:
+        print("Error: No slopes calculated for any symbol")
+        return None
+    
+    # Combine all slope series into a single DataFrame
+    print("Combining data")
+    combined_df = pd.concat(slope_dict.values(), axis=1, keys=slope_dict.keys())
+
+    # Reindex to get all dates and fill missing dates with NaN
+    print("Aligning data")
+    combined_df = combined_df.reindex(pd.date_range(start=combined_df.index.min(), end=combined_df.index.max(), freq='B'))
+
+    # Calculate percentile ranks
+    print("Calculating percentile ranks")
+    ranks_df = combined_df.rank(axis=0)
+    percentile_ranks_df = (ranks_df - 1) / (len(ranks_df) - 1) * 100
+    percentile_ranks_df = percentile_ranks_df.fillna(-1).astype(int)
+    
+    # Save to CSV
+    print("Saving to CSV")
+    percentile_ranks_df.to_csv('relative_strength_ranks.csv', index=True, header=True)
+    
+    # Print timing information
+    print(f"Average time for fetching data: {np.mean(fetch_times):.4f} seconds")
+    print(f"Average time for regression calculations: {np.mean(regression_times):.4f} seconds")
+    
+    return percentile_ranks_df
+
+def update_stock_dataframe_with_rs(df, RS_LR, window=63):
+    """
+    Updates the stock DataFrame by appending RS values and a column indicating new highs in RS.
+
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing the stock's historical data.
+        RS_LR (pandas.DataFrame): DataFrame containing the relative strength ranks for all stocks.
+        window (int, optional): The rolling window size to check for new RS highs. Defaults to 63 (approx. 3 months).
+
+    Returns:
+        pandas.DataFrame: Updated DataFrame with RS values and new high indication.
+    """
+    # Ensure the DateString column is in datetime format for proper alignment
+    df['DateString'] = pd.to_datetime(df['DateString'])
+    RS_LR.index = pd.to_datetime(RS_LR.index)
+    
+    # Extract the ticker symbol from the stock DataFrame
+    ticker = df['Symbol'].iloc[0]  # Assumes the ticker symbol is in the 'Symbol' column
+
+    if ticker not in RS_LR.columns:
+        raise ValueError(f"Ticker {ticker} not found in RS_LR DataFrame.")
+    
+    # Align the RS values with the stock DataFrame using DateString
+    df.set_index('DateString', inplace=True)
+    df['RS'] = RS_LR[ticker].reindex(df.index)
+
+    # Calculate the rolling maximum for the RS values
+    df['RS_New_High'] = df['RS'] == df['RS'].rolling(window, min_periods=1).max()
+    
+    # Reset the index to its original integer-based index
+    df.reset_index(inplace=True)
+
+    return df
