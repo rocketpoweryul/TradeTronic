@@ -1,6 +1,7 @@
 from    bokeh.io        import show
 from    bokeh.plotting  import figure
 from    bokeh.models    import ColumnDataSource, LinearAxis, SingleIntervalTicker, CustomJSTickFormatter, Arrow, VeeHead, BoxAnnotation, Span, Label
+from    bokeh.models    import TextInput
 
 import  pandas  as  pd
 
@@ -25,13 +26,15 @@ def Launch_GUI(df):
     arrow_length_pct    = 4
     
     # Check if the dataframe has the required columns
+    """
     required_columns = [
         'DateString', 'Open', 'High', 'Low', 'Close', 'SwHL', 'Peak', 'Consol_Detected', 'Consol_LHS_Price',
         'Consol_Depth_Percent', 'Symbol', 'Close_21_bar_ema', 'Close_50_bar_sma', 'Close_150_bar_sma', 'Close_200_bar_sma'
     ]
     if not all(column in df.columns for column in required_columns):
         raise ValueError("The input dataframe does not contain all the required columns.")
-    
+    """
+
     # Create a dictionary to store labels for Fridays and Thursdays that are followed by a Monday
     friday_labels = {}
     for i, date in enumerate(df['DateString']):
@@ -142,14 +145,6 @@ def Launch_GUI(df):
             bottom_side = top_side - (top_side * df.loc[right_side, 'Consol_Depth_Percent'] / 100)
             box = BoxAnnotation(left=left_side, right=right_side, top=top_side, bottom=bottom_side, fill_alpha=0.4, fill_color='orange')
 
-            print(f"Left Side Index: {left_side}")
-            print(f"Right Side Index: {right_side}")
-            print(f"Consol_LHS_Price at {right_side}: {df.loc[right_side, 'Consol_LHS_Price']}")
-            print(f"Consol_Depth_Percent at {right_side}: {df.loc[right_side, 'Consol_Depth_Percent']}")
-            print(f"Top Side: {top_side}, Bottom Side: {bottom_side}")
-            print(f"End Index: {end}\n")
-
-
             p.add_layout(box)
 
     # Plot SMAs and EMAs
@@ -218,6 +213,11 @@ def Launch_GUI(df):
     p.legend.title_text_font_style = "bold"
     p.legend.title_text_font_size = "12pt"
     p.legend.label_text_font_size = "10pt"
+
+    #GUI Controls
+    # Create the input field
+    ticker_input = TextInput(value="", title="Ticker Symbol:")
+
 
 
     # Display the plot
