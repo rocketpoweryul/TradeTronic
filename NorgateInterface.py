@@ -98,7 +98,7 @@ def get_us_equities_data():
     # Use a higher number of workers if the API and system can handle it
     max_workers = 20
 
-    excluded_keywords = ['warrant', 'cumul', 'perp', 'redeem', 'due']
+    excluded_keywords = ['warrant', 'cumul', 'perp', 'redeem', 'due', 'acquisition corp']
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_symbol = {executor.submit(get_symbol_details, symbol): symbol for symbol in symbols}
@@ -106,7 +106,7 @@ def get_us_equities_data():
             symbol = future_to_symbol[future]
             try:
                 data = future.result()
-                if data and not any(excluded_keyword.lower() in data['Security Name'].lower() for excluded_keyword in excluded_keywords) and not data['symbol'].endswith('.U'):
+                if data and not any(excluded_keyword.lower() in data['Security Name'].lower() for excluded_keyword in excluded_keywords) and not data['symbol'].endswith('.U') and not data['Security Name'].split()[-1] == "Unit":
                     equities_data.append(data)
             except Exception as e:
                 print(f"Error processing symbol {symbol}: {e}")

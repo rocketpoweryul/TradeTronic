@@ -1,11 +1,9 @@
 # open source modules
 import pandas as pd
 import numpy as np
-from scipy.stats import linregress, rankdata
 import tqdm
 import concurrent.futures
-import time
-from numba import jit
+from scipy.stats import rankdata
 
 # internal modules
 from    NorgateInterface import *
@@ -474,97 +472,139 @@ def add_relative_strength_line(df, index="S&P500", new_high_bars=69):
     
     return df
 
-@jit(nopython=True)
-def compute_slopes(close_prices, num_bars):
-    total_bars = len(close_prices)
-    num_bars_to_use = min(num_bars, total_bars)
+def compute_slope(y):
+    """
+    Computes the slope of the best-fit line for the given data points in a pandas Series.
 
-    x = np.arange(num_bars_to_use)
-    x_mean = np.mean(x)
-    slopes = np.empty(total_bars - num_bars_to_use + 1)
+    Parameters:
+    y (pandas Series): A Series of numerical values representing the dependent variable.
 
-    for i in range(num_bars_to_use, total_bars + 1):
-        y = close_prices[i - num_bars_to_use:i]
-        if np.any(np.isnan(y)):  # Check for missing values
-            slopes[i - num_bars_to_use] = np.nan
-        else:
-            y_mean = np.mean(y)
-            slope = np.sum((x - x_mean) * (y - y_mean)) / np.sum((x - x_mean) ** 2)
-            slopes[i - num_bars_to_use] = slope
+    Returns:
+    float: The slope of the best-fit line.
 
-    return slopes
-
-def compute_slope_for_symbol(symbol, num_bars):
-    try:
-        # Fetch data
-        start_fetch = time.time()
-        df = fetch_OHLCV(symbol=symbol, num_bars=num_bars*3, interval='D')
-        fetch_duration = time.time() - start_fetch
-
-        # Check if data fetching was successful
-        if df.empty or len(df) < 2:
-            print(f"\nWarning: Insufficient data for {symbol}")
-            return symbol, None, fetch_duration, 0
-
-        # Compute slopes
-        start_regression = time.time()
-        adjusted_num_bars = min(num_bars, len(df))
-        slopes = compute_slopes(df['Close'].values, adjusted_num_bars)
-        slope_series = pd.Series(slopes, index=df.index[adjusted_num_bars-1:])
-        regression_duration = time.time() - start_regression
-
-        return symbol, slope_series, fetch_duration, regression_duration
+    Raises:
+    ValueError: If the input is not a pandas Series, or if the length of y is less than 2.
+    """
     
-    except ZeroDivisionError:
-        print(f"Error processing symbol {symbol}: division by zero")
-        return symbol, None, 0, 0
+    # Ensure the input is a pandas Series
+    if not isinstance(y, pd.Series):
+        raise ValueError("Input must be a pandas Series.")
     
-    except ValueError as ve:
-        print(f"Error processing symbol {symbol}: {ve}")
-        return symbol, None, 0, 0
+    # Check if the length of the Series is sufficient to compute a slope
+    if len(y) < 2:
+        raise ValueError("At least two data points are required to compute a slope.")
     
-    except Exception as e:
-        print(f"Error processing symbol {symbol}: {e}")
-        return symbol, None, 0, 0
+    n = len(y)
+    x = np.arange(n)  # Generate a sequence of integers [0, 1, ..., n-1]
+    
+    # Calculate the necessary sums
+    sum_x = np.sum(x)
+    sum_y = np.sum(y)
+    sum_x_squared = np.sum(x ** 2)
+    sum_xy = np.sum(x * y)
+    
+    # Compute the slope using the formula for the least squares method
+    slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x_squared - sum_x ** 2)
+    
+    return slope
 
-def Compute_Rel_Strength_LR(symbol_list, num_bars=252):
+def process_symbol(symbol, num_bars):
+    """
+    Processes the OHLCV data for a given symbol to compute the slopes of closing prices over sliding windows.
+
+    Parameters:
+    symbol (str): The stock symbol for which the OHLCV data is to be fetched.
+    num_bars (int): The number of bars (periods) to be used in each sliding window for slope computation.
+
+    Returns:
+    tuple: A tuple containing the symbol and a DataFrame of slopes indexed by date. If the data is insufficient or missing, returns (symbol, None).
+
+    Raises:
+    ValueError: If `num_bars` is not a positive integer.
+    """
+    
+    # Validate num_bars input
+    if not isinstance(num_bars, int) or num_bars <= 0:
+        raise ValueError("num_bars must be a positive integer.")
+    
+    # Fetch OHLCV data
+    data = fetch_OHLCV(symbol=symbol, num_bars=num_bars*3, interval='D')
+
+    # Ensure there is enough data and that 'Close' column exists
+    if data is None or len(data) < num_bars or 'Close' not in data.columns:
+        return symbol, None
+
+    # Ensure the index is datetime and sorted
+    if not isinstance(data.index, pd.DatetimeIndex):
+        data.index = pd.to_datetime(data.index)
+    data.sort_index(inplace=True)
+
+    # Compute slopes for each window of 'num_bars'
+    slopes = [np.nan] * (num_bars - 1)  # Initialize with NaNs for the initial period
+    for i in range(num_bars - 1, len(data)):
+        window = data['Close'][i - num_bars + 1 : i + 1]  # Use only past data up to the current point
+        slope = compute_slope(window)
+        slopes.append(slope)
+
+    # Create a DataFrame with the slopes and dates
+    slopes_df = pd.DataFrame(slopes, index=data.index, columns=[symbol])
+
+    return symbol, slopes_df
+
+def Compute_Rel_Strength_LR(sec_list, num_bars=69, output_file='slopes.csv'):
+    """
+    Computes the relative strength using linear regression slopes for a list of securities over a specified number of bars.
+
+    Parameters:
+    sec_list (list): A list of stock symbols to be processed.
+    num_bars (int): The number of bars (periods) to be used in each sliding window for slope computation. Default is 69.
+    output_file (str): The file path to save the output CSV file with slopes. Default is 'slopes.csv'.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the relative strength linear regression ranks for each stock symbol.
+
+    Raises:
+    ValueError: If `sec_list` is not a list or is empty, or if `num_bars` is not a positive integer.
+    """
+
+    # Validate input parameters
+    if not isinstance(sec_list, list) or not sec_list:
+        raise ValueError("sec_list must be a non-empty list of stock symbols.")
+    if not isinstance(num_bars, int) or num_bars <= 0:
+        raise ValueError("num_bars must be a positive integer.")
+    if not isinstance(output_file, str):
+        raise ValueError("output_file must be a string representing the file path.")
+
+    # Initialize dictionary for storing historical slopes from each ticker
     slope_dict = {}
-    fetch_times = []
-    regression_times = []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(compute_slope_for_symbol, symbol, num_bars): symbol for symbol in symbol_list}
-        for future in tqdm(concurrent.futures.as_completed(futures), total=len(symbol_list), desc='Processing symbols'):
-            symbol, slope_series, fetch_duration, regression_duration = future.result()
-            fetch_times.append(fetch_duration)
-            regression_times.append(regression_duration)
-            if slope_series is not None:
-                slope_dict[symbol] = slope_series
+    # Use ProcessPoolExecutor to process symbols in parallel
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # Map each symbol to the process_symbol function
+        future_to_symbol = {executor.submit(process_symbol, symbol, num_bars): symbol for symbol in sec_list}
+        
+        # Use tqdm to display the progress bar
+        for future in tqdm(concurrent.futures.as_completed(future_to_symbol), total=len(sec_list), desc="Processing stocks"):
+            symbol, slopes_df = future.result()
+            if slopes_df is not None:
+                slope_dict[symbol] = slopes_df
 
-    if not slope_dict:
-        print("Error: No slopes calculated for any symbol")
-        return None
+    # Combine all DataFrames horizontally, ensuring no hierarchical columns are created
+    combined_df = pd.concat(slope_dict.values(), axis=1)
 
-    # Save the slope_dict to CSV
-    slope_df = pd.concat(slope_dict.values(), axis=1, keys=slope_dict.keys())
-    slope_df.to_csv('slope_dict.csv', index=True)
+    # Rename columns to the respective stock symbols
+    combined_df.columns = list(slope_dict.keys())
 
-    combined_df = pd.concat(slope_dict.values(), axis=1, keys=slope_dict.keys())
+    # Output to file if necessary
+    combined_df.to_csv(output_file)
 
-    # Using the dates directly from the combined DataFrame
-    combined_df = combined_df.reindex(combined_df.index)
+    # Compute row-wise percentile ranks
+    RS_LR = combined_df.rank(axis=1, pct=True) * 100 - 1
 
-    valid_stocks_count = combined_df.notna().sum(axis=1)
-    ranks_df = combined_df.rank(axis=1, method='min', na_option='bottom')
-    ranks_df = ranks_df.div(valid_stocks_count, axis=0).multiply(100).clip(0, 100)
+    # Handle missing values by setting them to -1
+    RS_LR = RS_LR.fillna(-1).astype(int)
 
-    # Convert to integers, ensuring we handle non-finite values properly
-    percentile_ranks_df = ranks_df.apply(lambda row: row.map(lambda v: int(v) if pd.notna(v) else -1), axis=1)
-
-    print(f"Average time for fetching data: {np.mean(fetch_times):.4f} seconds")
-    print(f"Average time for regression calculations: {np.mean(regression_times):.4f} seconds")
-
-    return percentile_ranks_df
+    return RS_LR
 
 def update_stock_dataframe_with_rs(df, RS_LR, window=63):
     """
