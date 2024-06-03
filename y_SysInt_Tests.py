@@ -10,7 +10,7 @@ from GUI              import *
 
 # perform daily maintenance on data stored to disk
 update_useq = False
-update_RS   = False
+update_RS   = True
 
 # clear terminal
 os.system('cls')
@@ -21,7 +21,7 @@ pd.set_option('display.max_columns',    100)
 pd.set_option('display.width',          2000)
 
 # get the data from Norgate
-df = fetch_OHLCV(symbol = 'DELL', num_bars = 252, interval = 'D')
+df = fetch_OHLCV(symbol = 'DELL', num_bars = 300, interval = 'D')
 
 ## Initial stock dataframe processeing
 df = find_swing_high_and_lows(df)
@@ -49,11 +49,9 @@ if update_useq:
 
     # Print a chunk of us_equities_data for verification
     chunk_size = min(5, len(us_equities_data))  # Adjust chunk_size as needed
-    print("Sample of us_equities_data:")
-    for row in us_equities_data[:chunk_size]:
-        print(row)
 
     with open('us_equities_data.csv', 'w', newline='') as f:
+        print("Saving us_equities_data.csv file")
         fieldnames = ['symbol', 'Security Name', 'domicile', 'Short Exchange Name', 'GICS Sector', 'GICS Industry']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()  # Write the header row
@@ -63,6 +61,7 @@ if update_useq:
 else:
     # Open the CSV file
     sec_list =  []
+    print("Loading us_equities_data.csv file")
     with open('us_equities_data.csv', 'r') as f:
         
         reader = csv.reader(f)
@@ -77,14 +76,20 @@ if update_RS:
     RS_LR = Compute_Rel_Strength_LR(sec_list, num_bars=69)
     
     # Save the DataFrame to a CSV file using to_csv method
+    print("Saving RS_LR.csv file")
     RS_LR.to_csv('RS_LR.csv', index=True, header=True)
 else:
     # Load the DataFrame from a CSV file using pandas
+    print("Loading RS_LR.csv file")
     RS_LR = pd.read_csv('RS_LR.csv', index_col=0)
 
-print(df.head())
-
 df = update_stock_dataframe_with_rs(df, RS_LR, window=63)
+df = get_stage2_uptrend(df)
 
 # Launch GUI
+print("Launching GUI")
 Launch_GUI(df)
+
+# save df for inspection
+print("Saving df.csv")
+df.to_csv('df.csv')

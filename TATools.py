@@ -476,99 +476,62 @@ def add_relative_strength_line(df, index="S&P500", new_high_bars=69):
 
 @jit(nopython=True)
 def compute_slopes(close_prices, num_bars):
-    """
-    Computes the slopes of linear regressions on rolling windows of closing prices.
-
-    Parameters:
-        close_prices (numpy.ndarray): Array of closing prices.
-        num_bars (int): Number of bars in each rolling window.
-
-    Returns:
-        numpy.ndarray: Array of computed slopes.
-    """
     total_bars = len(close_prices)
     num_bars_to_use = min(num_bars, total_bars)
-    
+
     x = np.arange(num_bars_to_use)
     x_mean = np.mean(x)
     slopes = np.empty(total_bars - num_bars_to_use + 1)
 
     for i in range(num_bars_to_use, total_bars + 1):
         y = close_prices[i - num_bars_to_use:i]
-        y_mean = np.mean(y)
-        slope = np.sum((x - x_mean) * (y - y_mean)) / np.sum((x - x_mean) ** 2)
-        slopes[i - num_bars_to_use] = slope
-    
+        if np.any(np.isnan(y)):  # Check for missing values
+            slopes[i - num_bars_to_use] = np.nan
+        else:
+            y_mean = np.mean(y)
+            slope = np.sum((x - x_mean) * (y - y_mean)) / np.sum((x - x_mean) ** 2)
+            slopes[i - num_bars_to_use] = slope
+
     return slopes
 
 def compute_slope_for_symbol(symbol, num_bars):
-    """
-    Fetches OHLCV data for a symbol, computes the slopes of linear regressions
-    on rolling windows of closing prices, and measures the time taken for each step.
-
-    Parameters:
-        symbol (str): The ticker symbol for which to compute the slopes.
-        num_bars (int): Number of bars in each rolling window.
-
-    Returns:
-        tuple: (symbol, slope_series, fetch_duration, regression_duration)
-            - symbol (str): The ticker symbol.
-            - slope_series (pandas.Series): Series of computed slopes.
-            - fetch_duration (float): Time taken to fetch the data.
-            - regression_duration (float): Time taken to compute the slopes.
-    """
     try:
         # Fetch data
         start_fetch = time.time()
-        df = fetch_OHLCV(symbol=symbol, num_bars=None, interval='D')
+        df = fetch_OHLCV(symbol=symbol, num_bars=num_bars*3, interval='D')
         fetch_duration = time.time() - start_fetch
 
         # Check if data fetching was successful
-        if df.empty:
-            print(f"\nWarning: Empty DF. {symbol}")
+        if df.empty or len(df) < 2:
+            print(f"\nWarning: Insufficient data for {symbol}")
             return symbol, None, fetch_duration, 0
-
-        # Adjust num_bars for recent IPOs
-        if len(df) < num_bars:
-            num_bars = len(df)
 
         # Compute slopes
         start_regression = time.time()
-        slopes = compute_slopes(df['Close'].values, num_bars)
-        if len(slopes) == 0:
-            print(f"Error processing symbol {symbol}: No slopes calculated")
-            return symbol, None, fetch_duration, time.time() - start_regression
-        
-        slope_series = pd.Series(slopes, index=df.index[num_bars-1:])
+        adjusted_num_bars = min(num_bars, len(df))
+        slopes = compute_slopes(df['Close'].values, adjusted_num_bars)
+        slope_series = pd.Series(slopes, index=df.index[adjusted_num_bars-1:])
         regression_duration = time.time() - start_regression
 
         return symbol, slope_series, fetch_duration, regression_duration
+    
     except ZeroDivisionError:
         print(f"Error processing symbol {symbol}: division by zero")
         return symbol, None, 0, 0
+    
     except ValueError as ve:
         print(f"Error processing symbol {symbol}: {ve}")
         return symbol, None, 0, 0
+    
     except Exception as e:
         print(f"Error processing symbol {symbol}: {e}")
         return symbol, None, 0, 0
 
 def Compute_Rel_Strength_LR(symbol_list, num_bars=252):
-    """
-    Computes the Relative Strength (RS) of each symbol in the provided list using linear regression slopes.
-
-    Parameters:
-        symbol_list (list of str): List of ticker symbols as strings.
-        num_bars (int, optional): Number of bars in each rolling window for regression. Defaults to 252.
-
-    Returns:
-        pandas.DataFrame: DataFrame containing the percentile ranks of the linear regression slopes for each symbol.
-    """
     slope_dict = {}
     fetch_times = []
     regression_times = []
 
-    # Concurrently compute slopes for each symbol
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(compute_slope_for_symbol, symbol, num_bars): symbol for symbol in symbol_list}
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(symbol_list), desc='Processing symbols'):
@@ -581,29 +544,26 @@ def Compute_Rel_Strength_LR(symbol_list, num_bars=252):
     if not slope_dict:
         print("Error: No slopes calculated for any symbol")
         return None
-    
-    # Combine all slope series into a single DataFrame
-    print("Combining data")
+
+    # Save the slope_dict to CSV
+    slope_df = pd.concat(slope_dict.values(), axis=1, keys=slope_dict.keys())
+    slope_df.to_csv('slope_dict.csv', index=True)
+
     combined_df = pd.concat(slope_dict.values(), axis=1, keys=slope_dict.keys())
 
-    # Reindex to get all dates and fill missing dates with NaN
-    print("Aligning data")
-    combined_df = combined_df.reindex(pd.date_range(start=combined_df.index.min(), end=combined_df.index.max(), freq='B'))
+    # Using the dates directly from the combined DataFrame
+    combined_df = combined_df.reindex(combined_df.index)
 
-    # Calculate percentile ranks
-    print("Calculating percentile ranks")
-    ranks_df = combined_df.rank(axis=0)
-    percentile_ranks_df = (ranks_df - 1) / (len(ranks_df) - 1) * 100
-    percentile_ranks_df = percentile_ranks_df.fillna(-1).astype(int)
-    
-    # Save to CSV
-    print("Saving to CSV")
-    percentile_ranks_df.to_csv('relative_strength_ranks.csv', index=True, header=True)
-    
-    # Print timing information
+    valid_stocks_count = combined_df.notna().sum(axis=1)
+    ranks_df = combined_df.rank(axis=1, method='min', na_option='bottom')
+    ranks_df = ranks_df.div(valid_stocks_count, axis=0).multiply(100).clip(0, 100)
+
+    # Convert to integers, ensuring we handle non-finite values properly
+    percentile_ranks_df = ranks_df.apply(lambda row: row.map(lambda v: int(v) if pd.notna(v) else -1), axis=1)
+
     print(f"Average time for fetching data: {np.mean(fetch_times):.4f} seconds")
     print(f"Average time for regression calculations: {np.mean(regression_times):.4f} seconds")
-    
+
     return percentile_ranks_df
 
 def update_stock_dataframe_with_rs(df, RS_LR, window=63):
@@ -639,3 +599,46 @@ def update_stock_dataframe_with_rs(df, RS_LR, window=63):
     df.reset_index(inplace=True)
 
     return df
+
+def get_stage2_uptrend(df):
+    """
+    This function determines if the stock represented by the dataframe is in a stage 2 uptrend.
+
+    Parameters:
+    df (pandas.DataFrame): DataFrame containing the stock's historical data.
+        The required columns are 'Close', '50_bar_sma', '150_bar_sma', '200_bar_sma', 'RS'.
+
+    Returns:
+    pandas.Series: A boolean Series indicating whether the stock is in a stage 2 uptrend.
+    """
+    # Check if all required columns exist
+    required_columns = ['Close', 'Close_50_bar_sma', 'Close_150_bar_sma', 'Close_200_bar_sma', 'RS']
+    if not all(column in df.columns for column in required_columns):
+        missing_cols = set(required_columns) - set(df.columns)
+        raise ValueError(f"Missing required columns: {', '.join(missing_cols)}")
+
+    # Calculate the 52 week low and high
+    df['52_week_low'] = df['Close'].rolling(window=252).min()
+    df['52_week_high'] = df['Close'].rolling(window=252).max()
+
+    # Define the stage 2 uptrend rules
+    rules = [
+        (df['Close_150_bar_sma'] > df['Close_200_bar_sma']),  # 1. 150 day SMA is above 200 day SMA
+        (df['Close_50_bar_sma'] > df['Close_150_bar_sma']),  # 2. 50 day SMA is above the 150 day SMA
+        (df['Close'] > df['Close_150_bar_sma']),  # 3. Closing price is above the 150 day SMA
+        (df['Close_200_bar_sma'].diff(21) > 0),  # 4. 200-day SMA is uptrending for at least one month (21 days)
+        ((df['Close'] - df['52_week_low']) / df['52_week_low'] > 0.25),  # 5. Closing price is at least 25% above the 52 week low
+        ((df['Close'] / df['52_week_high']) > 0.75),  # 6. Closing price is within 25% of the 52 week high
+        (df['RS'] > 70)  # 7. Relative Strength (RS) is greater than 70
+    ]
+
+    # Combine all rules using logical AND operation
+    df['Stage 2'] = np.all(rules, axis=0)
+
+    # Identify which rule(s) are failing
+    for i, rule in enumerate(rules):
+        if not rule.iloc[-1]:  # Check the last row of the dataframe
+            print(f"Rule {i+1} failed: {rule.name}")
+    
+    return df
+    
