@@ -63,7 +63,6 @@ def get_us_equities_data():
     """
     def get_symbol_details(symbol):
         try:
-            assetid = norgatedata.assetid(symbol)
             security_name = norgatedata.security_name(symbol)
             domicile = norgatedata.domicile(symbol)
             exchange_name = norgatedata.exchange_name(symbol)
@@ -96,13 +95,18 @@ def get_us_equities_data():
     # Get the total number of symbols
     total_symbols = len(symbols)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    # Use a higher number of workers if the API and system can handle it
+    max_workers = 20
+
+    excluded_keywords = ['warrant', 'cumul', 'perp', 'redeem', 'due', 'acquisition corp']
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_symbol = {executor.submit(get_symbol_details, symbol): symbol for symbol in symbols}
         for future in tqdm(concurrent.futures.as_completed(future_to_symbol), total=total_symbols, desc="Processing symbols"):
             symbol = future_to_symbol[future]
             try:
                 data = future.result()
-                if data:
+                if data and not any(excluded_keyword.lower() in data['Security Name'].lower() for excluded_keyword in excluded_keywords) and not data['symbol'].endswith('.U') and not data['Security Name'].split()[-1] == "Unit":
                     equities_data.append(data)
             except Exception as e:
                 print(f"Error processing symbol {symbol}: {e}")
