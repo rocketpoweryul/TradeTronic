@@ -22,7 +22,7 @@ pd.set_option('display.width',          2000)
 
 if __name__ == '__main__':
     # get the data from Norgate
-    df = fetch_OHLCV(symbol = 'DELL', num_bars = 300, interval = 'D')
+    df = fetch_OHLCV(symbol = 'DELL', num_bars = 252*2, interval = 'D')
 
     ## Initial stock dataframe processeing
     df = find_swing_high_and_lows(df)
@@ -91,7 +91,7 @@ if __name__ == '__main__':
 
     # Launch GUI
     #print("Launching GUI")
-    #Launch_GUI(df)
+    Launch_GUI(df)
 
     # save df for inspection
     print("Saving df.csv")
