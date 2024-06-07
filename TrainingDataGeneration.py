@@ -1,9 +1,11 @@
 import csv
-from tqdm import tqdm
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from tqdm import tqdm
+import os
+import multiprocessing
 
 # functions from this project
 from NorgateInterface import *
@@ -88,22 +90,21 @@ def process_symbol(symbol):
         print(f"Error processing symbol {symbol}: {e}")
         return [], [], []
 
+def load_sec_list(filename):
+    sec_list = []
+    with open(filename, 'r') as f:
+        reader = csv.reader(f)
+        # Skip the header row
+        next(reader)
+        sec_list = [row[0] for row in reader]
+    return sec_list
+
 if __name__ == '__main__':
     # Get the list of securities
     print("Accessing list of securities...")
-    sec_list = []
     try:
         print("Loading us_equities_data.csv file")
-        with open('us_equities_data.csv', 'r') as f:
-            reader = csv.reader(f)
-            # Skip the header row
-            next(reader)
-
-            # Store the data in a list of lists
-            us_equities_data = [row for row in reader]
-
-            for row in tqdm(us_equities_data, desc="Processing rows"):
-                sec_list.append(row[0])
+        sec_list = load_sec_list('us_equities_data.csv')
 
         if not sec_list:
             raise ValueError("No securities found in the input file")
@@ -116,7 +117,8 @@ if __name__ == '__main__':
         all_metadata = []   # Captures metadata for each identified training example
 
         # Process symbols in parallel
-        with ProcessPoolExecutor(max_workers=8) as executor:
+        num_workers = min(14, os.cpu_count() - 2)  # Adjust based on available CPUs
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
             future_to_symbol = {executor.submit(process_symbol, symbol): symbol for symbol in sec_list}
             for future in tqdm(as_completed(future_to_symbol), total=len(sec_list), desc="Processing symbols"):
                 symbol = future_to_symbol[future]

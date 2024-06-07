@@ -30,33 +30,17 @@ def find_swing_high_and_lows(df):
     
     if df.shape[0] < 3:
         raise ValueError("DataFrame must contain at least 3 rows of data")
-    
-    #df = df.copy()  # Make a copy to avoid modifying the original DataFrame
-    
+
     df['SwHL'] = 0
+    df['prev_High'] = df['High'].shift(1)
+    df['next_High'] = df['High'].shift(-1)
+    df['prev_Low'] = df['Low'].shift(1)
+    df['next_Low'] = df['Low'].shift(-1)
 
-    for i in range(1, len(df) - 1):
-        # determine current high and low values
-        curr_high = df['High'].iloc[i    ]
-        next_high = df['High'].iloc[i + 1]
-        prev_high = df['High'].iloc[i - 1]
-        
-        curr_low = df['Low'].iloc[i    ]
-        next_low = df['Low'].iloc[i + 1]
-        prev_low = df['Low'].iloc[i - 1]
+    df['SwHL'] = np.where((df['High'] > df['prev_High']) & (df['High'] > df['next_High']), 1, df['SwHL'])
+    df['SwHL'] = np.where((df['Low'] < df['prev_Low']) & (df['Low'] < df['next_Low']), -1, df['SwHL'])
 
-        # detect swing high
-        is_swing_high = curr_high > next_high and curr_high > prev_high
-
-        # detect swing low
-        is_swing_low = curr_low < next_low and curr_low < prev_low
-
-        # add detection results to dataframe
-        if is_swing_high:
-            df.at[df.index[i], 'SwHL'] = 1
-        elif is_swing_low:
-            df.at[df.index[i], 'SwHL'] = -1
-
+    df.drop(['prev_High', 'next_High', 'prev_Low', 'next_Low'], axis=1, inplace=True)
     return df
 
 def filter_swing_high_and_lows(df):
@@ -73,62 +57,52 @@ def filter_swing_high_and_lows(df):
         ValueError: If DataFrame does not contain 'SwHL', 'High', and 'Low' columns,
                     or if DataFrame contains fewer than 3 data points.
     """
-    if 'SwHL' not in df.columns or 'High' not in df.columns or 'Low' not in df.columns:
+    if not {'SwHL', 'High', 'Low'}.issubset(df.columns):
         raise ValueError("DataFrame must contain 'SwHL', 'High', and 'Low' columns.")
     if len(df) < 3:
         raise ValueError("DataFrame must contain at least 3 data points.")
     
-    # Create a copy of the SwHL column to modify it
-    filtered_SwHL = df['SwHL'].copy()
-    
+    # Convert columns to numpy arrays for faster access
+    SwHL = df['SwHL'].values
+    High = df['High'].values
+    Low = df['Low'].values
+
     # Variables to hold the current retained high/low and their indices
     current_high = None
     current_high_index = None
     current_low = None
     current_low_index = None
-    
-    # Loop through the DataFrame using iloc for positional indexing
+
+    # Iterate through the DataFrame once
     for i in range(1, len(df)):
-        if df['SwHL'].iloc[i] == 1:  # Current point is a swing high
-            if current_high is None:
-                # First swing high found
-                current_high = df['High'].iloc[i]
+        if SwHL[i] == 1:  # Current point is a swing high
+            if current_high is None or High[i] > current_high:
+                # Found a new higher swing high, update current_high
+                if current_high is not None:
+                    SwHL[current_high_index] = 0  # Reset the previous swing high
+                current_high = High[i]
                 current_high_index = i
-                # reset swing lows since streak is killed
+                # Reset swing lows since the streak is killed
                 current_low = None
                 current_low_index = None
             else:
-                # Check if this high is better than the last retained high
-                if df['High'].iloc[i] > current_high:
-                    # New higher swing high, replace the previous
-                    filtered_SwHL.iloc[current_high_index] = 0
-                    current_high = df['High'].iloc[i]
-                    current_high_index = i
-                else:
-                    # Lower swing high, filter it out
-                    filtered_SwHL.iloc[i] = 0
+                SwHL[i] = 0  # Lower swing high, filter it out
 
-        elif df['SwHL'].iloc[i] == -1:  # Current point is a swing low
-            if current_low is None:
-                # First swing low found
-                current_low = df['Low'].iloc[i]
+        elif SwHL[i] == -1:  # Current point is a swing low
+            if current_low is None or Low[i] < current_low:
+                # Found a new lower swing low, update current_low
+                if current_low is not None:
+                    SwHL[current_low_index] = 0  # Reset the previous swing low
+                current_low = Low[i]
                 current_low_index = i
-                # reset swing highs since streak is killed
+                # Reset swing highs since the streak is killed
                 current_high = None
                 current_high_index = None
             else:
-                # Check if this low is better than the last retained low
-                if df['Low'].iloc[i] < current_low:
-                    # New lower swing low, replace the previous
-                    filtered_SwHL.iloc[current_low_index] = 0
-                    current_low = df['Low'].iloc[i]
-                    current_low_index = i
-                else:
-                    # Higher swing low, filter it out
-                    filtered_SwHL.iloc[i] = 0
+                SwHL[i] = 0  # Higher swing low, filter it out
 
     # Replace original SwHL with filtered values
-    df['SwHL'] = filtered_SwHL
+    df['SwHL'] = SwHL
     return df
 
 def filter_peaks(df):
@@ -153,50 +127,57 @@ def filter_peaks(df):
         ValueError: If the input DataFrame does not contain 'SwHL', 'High', and 'Low' columns.
     """
     
-    if not {'High', "Low", "SwHL"}.issubset(df.columns):
+    if not {'High', 'Low', 'SwHL'}.issubset(df.columns):
         raise ValueError("Dataframe must contain 'High', 'Low', 'SwHL' columns.")
     
-    # init a new peak column with zeros
+    # Initialize a new Peak column with zeros
     df['Peak'] = 0
     
-    # get indices for swing highs and lows
-    swing_highs = df.index[df['SwHL'] ==  1].tolist()
-    swing_lows  = df.index[df['SwHL'] == -1].tolist()
+    # Convert columns to numpy arrays for faster access
+    SwHL = df['SwHL'].values
+    High = df['High'].values
+    Low = df['Low'].values
+    Peak = df['Peak'].values
     
-    # loop through swing highs, starting at the second occurrence and ending at 2nd last occurrence given the rules
-    for i in range( 1, len(swing_highs) - 1 ):
-        prev_swing_high_price = df.loc[swing_highs[i-1], 'High']
-        curr_swing_high_price = df.loc[swing_highs[i  ], 'High']
-        next_swing_high_price = df.loc[swing_highs[i+1], 'High']
+    # Get indices for swing highs and lows
+    swing_highs = [i for i in range(len(SwHL)) if SwHL[i] == 1]
+    swing_lows = [i for i in range(len(SwHL)) if SwHL[i] == -1]
+    
+    # Loop through swing highs, starting at the second occurrence and ending at the second last occurrence
+    for i in range(1, len(swing_highs) - 1):
+        prev_swing_high_price = High[swing_highs[i-1]]
+        curr_swing_high_price = High[swing_highs[i]]
+        next_swing_high_price = High[swing_highs[i+1]]
         
         # Find the index of the next swing low after the current swing high
         next_swing_low_indices = [low for low in swing_lows if low > swing_highs[i]]
-        next_swing_low_price = df.loc[next_swing_low_indices[0], 'Low'] if next_swing_low_indices else None
+        next_swing_low_price = Low[next_swing_low_indices[0]] if next_swing_low_indices else None
         
-        # detect positive peak
-         # Detect positive peak
+        # Detect positive peak
         if curr_swing_high_price > prev_swing_high_price and \
-          (curr_swing_high_price > next_swing_high_price or  \
+          (curr_swing_high_price > next_swing_high_price or \
            (next_swing_low_price is not None and prev_swing_high_price > next_swing_low_price)):
-            df.loc[swing_highs[i], 'Peak'] = 1
-            
-    # loop through swing lows, starting at the second occurrence and ending at 2nd last occurrence given the rules
-    for i in range( 1, len(swing_lows) - 1 ):
-        prev_swing_low_price  = df.loc[swing_lows[ i-1], 'Low' ]
-        curr_swing_low_price  = df.loc[swing_lows[ i  ], 'Low' ]
-        next_swing_low_price  = df.loc[swing_lows[ i+1], 'Low' ]
+            Peak[swing_highs[i]] = 1
+    
+    # Loop through swing lows, starting at the second occurrence and ending at the second last occurrence
+    for i in range(1, len(swing_lows) - 1):
+        prev_swing_low_price = Low[swing_lows[i-1]]
+        curr_swing_low_price = Low[swing_lows[i]]
+        next_swing_low_price = Low[swing_lows[i+1]]
         
-        # find the index of the next swing high after the current swing low
+        # Find the index of the next swing high after the current swing low
         next_swing_high_indices = [high for high in swing_highs if high > swing_lows[i]]
-        next_swing_high_price = df.loc[next_swing_high_indices[0], 'High'] if next_swing_high_indices else None
-
+        next_swing_high_price = High[next_swing_high_indices[0]] if next_swing_high_indices else None
+        
         # Detect negative peak
         if curr_swing_low_price < prev_swing_low_price and \
            (curr_swing_low_price < next_swing_low_price or \
             (next_swing_high_price is not None and prev_swing_low_price < next_swing_high_price)):
-            df.loc[swing_lows[i], 'Peak'] = -1
-            
-    return df    
+            Peak[swing_lows[i]] = -1
+    
+    return df
+
+
 
 def detect_consolidation(df, consol_min_bars=20, consol_mindepth_pct=5, consol_maxdepth_pct=35):
     """
@@ -551,14 +532,13 @@ def process_symbol(symbol, num_bars):
 
     return symbol, slopes_df
 
-def Compute_Rel_Strength_LR(sec_list, num_bars=69, output_file='slopes.csv'):
+def Compute_Rel_Strength_LR(sec_list, num_bars=69):
     """
     Computes the relative strength using linear regression slopes for a list of securities over a specified number of bars.
 
     Parameters:
     sec_list (list): A list of stock symbols to be processed.
     num_bars (int): The number of bars (periods) to be used in each sliding window for slope computation. Default is 69.
-    output_file (str): The file path to save the output CSV file with slopes. Default is 'slopes.csv'.
 
     Returns:
     pd.DataFrame: A DataFrame containing the relative strength linear regression ranks for each stock symbol.
@@ -572,8 +552,6 @@ def Compute_Rel_Strength_LR(sec_list, num_bars=69, output_file='slopes.csv'):
         raise ValueError("sec_list must be a non-empty list of stock symbols.")
     if not isinstance(num_bars, int) or num_bars <= 0:
         raise ValueError("num_bars must be a positive integer.")
-    if not isinstance(output_file, str):
-        raise ValueError("output_file must be a string representing the file path.")
 
     # Initialize dictionary for storing historical slopes from each ticker
     slope_dict = {}
@@ -594,9 +572,6 @@ def Compute_Rel_Strength_LR(sec_list, num_bars=69, output_file='slopes.csv'):
 
     # Rename columns to the respective stock symbols
     combined_df.columns = list(slope_dict.keys())
-
-    # Output to file if necessary
-    combined_df.to_csv(output_file)
 
     # Compute row-wise percentile ranks
     RS_LR = combined_df.rank(axis=1, pct=True) * 100 - 1
