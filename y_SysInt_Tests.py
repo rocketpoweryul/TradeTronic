@@ -1,4 +1,8 @@
 # open source modules
+import sys
+print(sys.executable)
+print(sys.path)
+
 import pandas as pd
 import os
 import csv
