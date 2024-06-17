@@ -648,9 +648,9 @@ def get_stage2_uptrend(df):
     df['Stage 2'] = np.all(rules, axis=0)
 
     # Identify which rule(s) are failing
-    for i, rule in enumerate(rules):
-        if not rule.iloc[-1]:  # Check the last row of the dataframe
-            print(f"Rule {i+1} failed: {rule.name}")
+    #for i, rule in enumerate(rules):
+    #    if not rule.iloc[-1]:  # Check the last row of the dataframe
+    #        print(f"Rule {i+1} failed: {rule.name}")
     
     return df
     
