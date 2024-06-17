@@ -8,7 +8,6 @@ import os
 import multiprocessing
 
 # functions from this project
-from NorgateInterface import *
 from TATools import *
 
 # hyperparameters
@@ -105,7 +104,7 @@ if __name__ == '__main__':
     print("Accessing list of securities...")
     try:
         print("Loading us_equities_data.csv file")
-        sec_list = load_sec_list('us_equities_data.csv')
+        sec_list = load_sec_list('data/us_equities_data.csv')
 
         if not sec_list:
             raise ValueError("No securities found in the input file")
