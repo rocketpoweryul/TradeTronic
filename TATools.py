@@ -177,8 +177,6 @@ def filter_peaks(df):
     
     return df
 
-
-
 def detect_consolidation(df, consol_min_bars=20, consol_mindepth_pct=5, consol_maxdepth_pct=35):
     """
     Analyze the entire stock history to detect consolidation phases and append the DataFrame with new columns.
@@ -627,7 +625,7 @@ def get_stage2_uptrend(df):
     pandas.Series: A boolean Series indicating whether the stock is in a stage 2 uptrend.
     """
     # Check if all required columns exist
-    required_columns = ['Close', 'Close_50_bar_sma', 'Close_150_bar_sma', 'Close_200_bar_sma', 'RS']
+    required_columns = ['Close', 'Close_50_bar_sma', 'Close_150_bar_sma', 'Close_200_bar_sma']
     if not all(column in df.columns for column in required_columns):
         missing_cols = set(required_columns) - set(df.columns)
         raise ValueError(f"Missing required columns: {', '.join(missing_cols)}")
@@ -644,7 +642,6 @@ def get_stage2_uptrend(df):
         (df['Close_200_bar_sma'].diff(21) > 0),  # 4. 200-day SMA is uptrending for at least one month (21 days)
         ((df['Close'] - df['52_week_low']) / df['52_week_low'] > 0.25),  # 5. Closing price is at least 25% above the 52 week low
         ((df['Close'] / df['52_week_high']) > 0.75),  # 6. Closing price is within 25% of the 52 week high
-        (df['RS'] > 70)  # 7. Relative Strength (RS) is greater than 70
     ]
 
     # Combine all rules using logical AND operation

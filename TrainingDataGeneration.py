@@ -12,12 +12,12 @@ from NorgateInterface import *
 from TATools import *
 
 # hyperparameters
-sequence_length = 252
+sequence_length = 63
 relevant_columns = [
     'Open', 'High', 'Low', 'Close', 'Volume', 'Turnover', 'Consol_Detected',
     'Consol_Len_Bars', 'Consol_Depth_Percent', 'Close_21_bar_ema',
     'Close_50_bar_sma', 'Close_150_bar_sma', 'Close_200_bar_sma',
-    'RSL', 'RSL_NH'
+    'RSL', 'RSL_NH', 'Stage 2'
 ]
 
 def process_symbol(symbol):
@@ -35,6 +35,7 @@ def process_symbol(symbol):
         df = add_moving_average(df, 150, 'sma')
         df = add_moving_average(df, 200, 'sma')
         df = add_relative_strength_line(df)
+        df = get_stage2_uptrend(df)
 
         # Convert index to integers, but save dates as datestrings 
         df['DateString'] = df.index.strftime('%Y-%m-%d')  # Save date info before resetting index
