@@ -109,3 +109,6 @@ data/
 my_dir/
 *.h5
 *.keras
+labels.npy
+metadata.npy
+sequences.npy

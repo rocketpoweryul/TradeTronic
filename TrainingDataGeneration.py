@@ -1,30 +1,43 @@
 import csv
-import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
+import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import os
 import multiprocessing
+import time
 
-# functions from this project
-from TATools import *
+# Import functions from TATools
+from TATools import (fetch_OHLCV, find_swing_high_and_lows, filter_swing_high_and_lows,
+                     filter_peaks, detect_consolidation, add_moving_average,
+                     add_relative_strength_line, get_stage2_uptrend,
+                     calculate_up_down_volume_ratio, calculate_atr, calculate_pct_b)
 
-# hyperparameters
-sequence_length = 63
-relevant_columns = [
+# Configuration and hyperparameters
+SEQUENCE_LENGTH = 63
+RELEVANT_COLUMNS = [
     'Open', 'High', 'Low', 'Close', 'Volume', 'Turnover', 'Consol_Detected',
     'Consol_Len_Bars', 'Consol_Depth_Percent', 'Close_21_bar_ema',
     'Close_50_bar_sma', 'Close_150_bar_sma', 'Close_200_bar_sma',
-    'RSL', 'RSL_NH', 'Stage 2'
+    'RSL', 'RSL_NH', 'Stage 2', 'UpDownVolumeRatio', 'ATR', '%B'
 ]
+INPUT_FILE = 'data/us_equities_data.csv'
+OUTPUT_SEQ_FILE = 'sequences.npy'
+OUTPUT_LABELS_FILE = 'labels.npy'
+OUTPUT_METADATA_FILE = 'metadata.npy'
+OUTPUT_CSV_FILE = 'TrainingLog.csv'
+MAX_WORKERS = min(11, os.cpu_count() - 1)
 
 def process_symbol(symbol):
+    """Process a single stock symbol to generate sequences, profits, and metadata."""
     try:
-        # Get stock data for processing
-        df = fetch_OHLCV(symbol, num_bars=None, interval='D')
+        start_time = time.time()
 
-        # Initial stock dataframe processing
+        df = fetch_OHLCV(symbol, num_bars=None, interval='D')
+        if df is None or df.empty:
+            return [], [], []
+
+        # Apply technical analysis
         df = find_swing_high_and_lows(df)
         df = filter_swing_high_and_lows(df)
         df = filter_peaks(df)
@@ -35,55 +48,43 @@ def process_symbol(symbol):
         df = add_moving_average(df, 200, 'sma')
         df = add_relative_strength_line(df)
         df = get_stage2_uptrend(df)
+        df = calculate_up_down_volume_ratio(df)
+        df = calculate_atr(df)
+        df = calculate_pct_b(df)
 
-        # Convert index to integers, but save dates as datestrings 
-        df['DateString'] = df.index.strftime('%Y-%m-%d')  # Save date info before resetting index
-
-        # Determine Friday dates before resetting the index for plotting purposes
-        df['DayOfWeek'] = df.index.weekday  # Monday=0, Sunday=6
-
-        # Reset index to use numerical index
+        df['DateString'] = df.index.strftime('%Y-%m-%d')
         df.reset_index(drop=True, inplace=True)
 
         symbol_sequences = []
         symbol_profits = []
         symbol_metadata = []
 
-        for index in range(len(df)):
-            if df['Consol_Detected'][index] == True:
-                breakout = False
-                consol_lhs_price = df['Consol_LHS_Price'][index]
+        for index in range(len(df) - 1):
+            if not df['Consol_Detected'].iloc[index] or df['Consol_Detected'].iloc[index + 1]:
+                continue
+
+            consol_lhs_price = df['Consol_LHS_Price'].iloc[index]
+            start_index = max(0, index - SEQUENCE_LENGTH + 1)
+            
+            seq = df[RELEVANT_COLUMNS].iloc[start_index:index + 1].values.tolist()
+            if len(seq) < SEQUENCE_LENGTH:
+                padding = [[0] * len(RELEVANT_COLUMNS)] * (SEQUENCE_LENGTH - len(seq))
+                seq = padding + seq
+            
+            for i in range(index + 1, len(df) - 2):
+                if not (df['Close'].iloc[i] < df['Close_50_bar_sma'].iloc[i] and 
+                        df['Close'].iloc[i + 1] < df['Close_50_bar_sma'].iloc[i + 1] and 
+                        df['Close'].iloc[i + 2] < df['Close_50_bar_sma'].iloc[i + 2]):
+                    continue
+
+                profit = df['Close'].iloc[i + 2] / consol_lhs_price - 1
                 
-                if index + 1 < len(df):
-                    if df['Consol_Detected'][index + 1] == False:
-                        breakout = True
-                        start_index = max(0, index - sequence_length + 1)
-                        
-                        # Create the sequence of data for this breakout
-                        seq = df[relevant_columns].iloc[start_index:index + 1].values.tolist()
+                symbol_sequences.append(seq)
+                symbol_profits.append(profit)
+                symbol_metadata.append([symbol, df['DateString'].iloc[index + 1]])
+                break
 
-                        # Pad sequences if they are shorter than sequence_length
-                        if len(seq) < sequence_length:
-                            padding = [[0] * len(relevant_columns)] * (sequence_length - len(seq))
-                            seq = padding + seq
-                        
-                        # Find the next occurrence where Close price is below Close_50_bar_sma for three consecutive bars
-                        for i in range(index + 1, len(df) - 2):
-                            if (df['Close'][i] < df['Close_50_bar_sma'][i] and 
-                                df['Close'][i + 1] < df['Close_50_bar_sma'][i + 1] and 
-                                df['Close'][i + 2] < df['Close_50_bar_sma'][i + 2]):
-                                
-                                profit = df['Close'][i + 2] / consol_lhs_price - 1
-                                
-                                # Append valid sequence and profit
-                                symbol_sequences.append(seq)
-                                symbol_profits.append(profit)
-                                
-                                # Append metadata to metadata list with correct breakout date
-                                meta = [symbol, df['DateString'][index + 1]]  # Adjust index to get the correct date
-                                symbol_metadata.append(meta)
-                                break  # Exit the loop after finding the valid profit
-
+        end_time = time.time()
         return symbol_sequences, symbol_profits, symbol_metadata
 
     except Exception as e:
@@ -91,37 +92,42 @@ def process_symbol(symbol):
         return [], [], []
 
 def load_sec_list(filename):
-    sec_list = []
-    with open(filename, 'r') as f:
-        reader = csv.reader(f)
-        # Skip the header row
-        next(reader)
-        sec_list = [row[0] for row in reader]
-    return sec_list
-
-if __name__ == '__main__':
-    # Get the list of securities
-    print("Accessing list of securities...")
+    """Load the list of securities from a CSV file."""
     try:
-        print("Loading us_equities_data.csv file")
-        sec_list = load_sec_list('data/us_equities_data.csv')
-
+        df = pd.read_csv(filename)
+        sec_list = df.iloc[:, 0].tolist()
         if not sec_list:
             raise ValueError("No securities found in the input file")
+        return sec_list
+    except Exception as e:
+        print(f"Error loading securities list: {e}")
+        return []
 
+def save_data(sequences, profits, metadata):
+    """Save processed data to files."""
+    np.save(OUTPUT_SEQ_FILE, sequences)
+    np.save(OUTPUT_LABELS_FILE, profits)
+    np.save(OUTPUT_METADATA_FILE, metadata)
+
+    combined_data = [[meta[0], meta[1], profit] for meta, profit in zip(metadata, profits)]
+    pd.DataFrame(combined_data, columns=['Symbol', 'Date', 'Profit']).to_csv(OUTPUT_CSV_FILE, index=False)
+
+def main():
+    print("Accessing list of securities...")
+    try:
+        print(f"Loading {INPUT_FILE} file")
+        sec_list = load_sec_list(INPUT_FILE)
         print(f"Total securities: {len(sec_list)}")
 
-        # Initialize training data
-        all_sequences = []  # Captures x for the training data
-        all_profits = []    # Captures y for the training data
-        all_metadata = []   # Captures metadata for each identified training example
+        all_sequences = []
+        all_profits = []
+        all_metadata = []
 
-        # Process symbols in parallel
-        num_workers = min(14, os.cpu_count() - 2)  # Adjust based on available CPUs
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            future_to_symbol = {executor.submit(process_symbol, symbol): symbol for symbol in sec_list}
-            for future in tqdm(as_completed(future_to_symbol), total=len(sec_list), desc="Processing symbols"):
-                symbol = future_to_symbol[future]
+        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {executor.submit(process_symbol, symbol): symbol for symbol in sec_list}
+            
+            for future in tqdm(as_completed(futures), total=len(sec_list), desc="Processing symbols"):
+                symbol = futures[future]
                 try:
                     symbol_sequences, symbol_profits, symbol_metadata = future.result()
                     all_sequences.extend(symbol_sequences)
@@ -133,37 +139,15 @@ if __name__ == '__main__':
         if not all_sequences or not all_profits or not all_metadata:
             raise ValueError("No valid data processed")
 
-        # Convert sequences and profits to numpy arrays for normalization
         sequences_array = np.array(all_sequences)
-        profits_array = np.array(all_profits).reshape(-1, 1)
+        profits_array = np.array(all_profits)
 
-        # Initialize the MinMaxScaler
-        scaler = MinMaxScaler()
+        save_data(sequences_array, profits_array, all_metadata)
 
-        # Fit and transform the sequences array
-        sequences_shape = sequences_array.shape
-        sequences_array = scaler.fit_transform(sequences_array.reshape(-1, sequences_array.shape[-1])).reshape(sequences_shape)
+        print("Data processing completed successfully.")
 
-        # Directly use raw profit values for CSV output
-        raw_profits = profits_array.flatten().tolist()
-
-        # Save sequences
-        np.save('sequences.npy', sequences_array)
-
-        # Save labels (raw profits)
-        labels = profits_array.flatten().tolist()
-        np.save('labels.npy', labels)
-
-        # Save metadata
-        np.save('metadata.npy', all_metadata)
-
-        # Combine metadata with raw profits for CSV output
-        combined_data = [[meta[0], meta[1], profit] for meta, profit in zip(all_metadata, labels)]
-
-        # Save csv record
-        with open('TrainingLog.csv', 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['Symbol', 'Date', 'Profit'])
-            writer.writerows(combined_data)
     except Exception as e:
         print(f"Error in main execution: {e}")
+
+if __name__ == '__main__':
+    main()

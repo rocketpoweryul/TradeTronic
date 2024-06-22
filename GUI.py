@@ -1,52 +1,22 @@
-from    bokeh.io        import show
-from    bokeh.plotting  import figure
-from    bokeh.models    import ColumnDataSource, LinearAxis, SingleIntervalTicker, CustomJSTickFormatter, Arrow, VeeHead, BoxAnnotation, Span, Label
-from    bokeh.models    import TextInput
-
-import  pandas  as  pd
+from bokeh.io import show
+from bokeh.plotting import figure
+from bokeh.models import ColumnDataSource, LinearAxis, SingleIntervalTicker, CustomJSTickFormatter
+from bokeh.models import Arrow, VeeHead, BoxAnnotation, Span, Label, Range1d, TextInput
+from bokeh.layouts import column
+import pandas as pd
 
 def Launch_GUI(df):
-    """
-    This function creates a candlestick plot with with arrows showing:
-    - Standard candlestick chart 
-    - Peaks and swing high/lows denoted by arrows
-    - Consolidation regions
-    
-    Parameters:
-    df (pandas.DataFrame): The input dataframe. It should contain the following columns: 'DateString', 'Open', 'High', 'Low', 'Close', 'SwHL', 'Peak', 'Consol_Detected', 'Consol_LHS_Price', 'Consol_Depth_Percent', 'Symbol'.
-    
-    Returns:
-    None. The function will display the plot but does not return anything.
-    
-    Raises:
-    ValueError: If the input dataframe does not contain the required columns.
-    """
+    # Configuration
+    arrow_distance_pct = 1
+    arrow_length_pct = 4
 
-    arrow_distance_pct  = 1
-    arrow_length_pct    = 4
-    
-    # Check if the dataframe has the required columns
-    """
-    required_columns = [
-        'DateString', 'Open', 'High', 'Low', 'Close', 'SwHL', 'Peak', 'Consol_Detected', 'Consol_LHS_Price',
-        'Consol_Depth_Percent', 'Symbol', 'Close_21_bar_ema', 'Close_50_bar_sma', 'Close_150_bar_sma', 'Close_200_bar_sma'
-    ]
-    if not all(column in df.columns for column in required_columns):
-        raise ValueError("The input dataframe does not contain all the required columns.")
-    """
+    # Create labels for Fridays and Thursdays followed by Mondays
+    friday_labels = {i: pd.to_datetime(date).strftime('%Y-%m-%d') for i, date in enumerate(df['DateString']) 
+                     if pd.to_datetime(date).weekday() == 4 or 
+                     (pd.to_datetime(date).weekday() == 3 and i < len(df['DateString']) - 1 
+                      and pd.to_datetime(df['DateString'][i + 1]).weekday() == 0)}
 
-    # Create a dictionary to store labels for Fridays and Thursdays that are followed by a Monday
-    friday_labels = {}
-    for i, date in enumerate(df['DateString']):
-        date = pd.to_datetime(date)
-        if date.weekday() == 4:  # Friday
-            friday_labels[i] = date.strftime('%Y-%m-%d')
-        elif date.weekday() == 3:  # Thursday
-            # Check if the next day is Monday (skipped)
-            if i < len(df['DateString']) - 1 and pd.to_datetime(df['DateString'][i + 1]).weekday() == 0:
-                friday_labels[i] = date.strftime('%Y-%m-%d')
-
-    # Create a ColumnDataSource for candlesticks
+    # Create ColumnDataSource for candlesticks
     source = ColumnDataSource(data=dict(
         index=df.index.tolist(),
         Open=df['Open'],
@@ -56,169 +26,138 @@ def Launch_GUI(df):
         color=['red' if close < open else 'blue' for open, close in zip(df['Open'], df['Close'])]
     ))
 
-    # Create specific data sources for arrows with adjustments - SwHL
+    # Create sources for arrows
     up_source_SwHL = ColumnDataSource(data={
-    'index':     df[(df['SwHL'] == 1) & (df['Peak'] == 0)].index,
-    'High':      df[(df['SwHL'] == 1) & (df['Peak'] == 0)]['High'],
-    'ArrowTip':  df[(df['SwHL'] == 1) & (df['Peak'] == 0)]['High'] * (1 + arrow_distance_pct/100),
-    'ArrowTail': df[(df['SwHL'] == 1) & (df['Peak'] == 0)]['High'] * (1 + (arrow_distance_pct + arrow_length_pct)/100)
+        'index': df[(df['SwHL'] == 1) & (df['Peak'] == 0)].index,
+        'High': df[(df['SwHL'] == 1) & (df['Peak'] == 0)]['High'],
+        'ArrowTip': df[(df['SwHL'] == 1) & (df['Peak'] == 0)]['High'] * (1 + arrow_distance_pct/100),
+        'ArrowTail': df[(df['SwHL'] == 1) & (df['Peak'] == 0)]['High'] * (1 + (arrow_distance_pct + arrow_length_pct)/100)
     })
 
     down_source_SwHL = ColumnDataSource(data={
-        'index':     df[(df['SwHL'] == -1) & (df['Peak'] == 0)].index,
-        'Low':       df[(df['SwHL'] == -1) & (df['Peak'] == 0)]['Low'],
-        'ArrowTip':  df[(df['SwHL'] == -1) & (df['Peak'] == 0)]['Low'] * (1 - arrow_distance_pct/100),
+        'index': df[(df['SwHL'] == -1) & (df['Peak'] == 0)].index,
+        'Low': df[(df['SwHL'] == -1) & (df['Peak'] == 0)]['Low'],
+        'ArrowTip': df[(df['SwHL'] == -1) & (df['Peak'] == 0)]['Low'] * (1 - arrow_distance_pct/100),
         'ArrowTail': df[(df['SwHL'] == -1) & (df['Peak'] == 0)]['Low'] * (1 - (arrow_distance_pct + arrow_length_pct)/100)
     })
 
-    # Create specific data sources for arrows with adjustments - peaks
     up_source_Peaks = ColumnDataSource(data={
-        'index':     df[df['Peak'] == 1].index,
-        'High':      df[df['Peak'] == 1]['High'],
-        'ArrowTip':  df[df['Peak'] == 1]['High'] * (1 + arrow_distance_pct/100),
+        'index': df[df['Peak'] == 1].index,
+        'High': df[df['Peak'] == 1]['High'],
+        'ArrowTip': df[df['Peak'] == 1]['High'] * (1 + arrow_distance_pct/100),
         'ArrowTail': df[df['Peak'] == 1]['High'] * (1 + (arrow_distance_pct + arrow_length_pct)/100)
     })
 
     down_source_Peaks = ColumnDataSource(data={
-        'index':     df[df['Peak'] == -1].index,
-        'Low':       df[df['Peak'] == -1]['Low'],
-        'ArrowTip':  df[df['Peak'] == -1]['Low'] * (1 - arrow_distance_pct/100),
+        'index': df[df['Peak'] == -1].index,
+        'Low': df[df['Peak'] == -1]['Low'],
+        'ArrowTip': df[df['Peak'] == -1]['Low'] * (1 - arrow_distance_pct/100),
         'ArrowTail': df[df['Peak'] == -1]['Low'] * (1 - (arrow_distance_pct + arrow_length_pct)/100)
     })
 
-    # Bokeh plot setup
-    p = figure(x_axis_type=None, title=df['Symbol'][0], sizing_mode="stretch_width", height=900)
-    p.title.text_font_size = '48pt'
+    # Main chart setup
+    p = figure(x_axis_type=None, title=df['Symbol'][0], sizing_mode="stretch_width", height=500)
+    p.title.text_font_size = '24pt'
     p.title.text_color = 'blue'
     p.background_fill_color = "#F2E7D4"
     p.background_fill_alpha = 0.3
+
+    # Add candlesticks
     p.segment('index', 'High', 'index', 'Low', color="black", source=source)
     p.vbar('index', width=0.7, top='Open', bottom='Close', fill_color='color', line_color='color', source=source)
 
-    # Add arrows for swing high low
-    if 'SwHL' in df.columns and df['SwHL'].notna().any():
-        p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_SwHL))
-        p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_SwHL))
+    # Add arrows
+    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_SwHL))
+    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_SwHL))
+    p.add_layout(Arrow(end=VeeHead(size=14), line_color="orange", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_Peaks))
+    p.add_layout(Arrow(end=VeeHead(size=14), line_color="orange", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_Peaks))
 
-    # Add arrows for up and down 
-    if 'Peak' in df.columns and df['Peak'].notna().any():
-        p.add_layout(Arrow(end=VeeHead(size=14), 
-                     line_color="orange",
-                     x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', 
-                     source=up_source_Peaks))
-        p.add_layout(Arrow(end=VeeHead(size=14), 
-                     line_color="orange",
-                     x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', 
-                     source=down_source_Peaks))
-    
-        # Add labels for high prices at peaks
-        for idx, high, adj_high in zip(up_source_Peaks.data['index'], up_source_Peaks.data['High'], up_source_Peaks.data['ArrowTail']):
-            formatted_high = "${:0.2f}".format(high)  # Format the price
-            price_label = Label(x=idx, y=adj_high, text=formatted_high, text_font_size="8pt", text_color="green",
-                                text_baseline="bottom", text_align="center")
-            p.add_layout(price_label)
+    # Add price labels
+    for idx, high, adj_high in zip(up_source_Peaks.data['index'], up_source_Peaks.data['High'], up_source_Peaks.data['ArrowTail']):
+        p.add_layout(Label(x=idx, y=adj_high, text="${:0.2f}".format(high), text_font_size="8pt", text_color="green", text_baseline="bottom", text_align="center"))
+    for idx, low, adj_low in zip(down_source_Peaks.data['index'], down_source_Peaks.data['Low'], down_source_Peaks.data['ArrowTail']):
+        p.add_layout(Label(x=idx, y=adj_low, text="${:0.2f}".format(low), text_font_size="8pt", text_color="red", text_baseline="top", text_align="center"))
 
-        # Add labels for low prices at troughs
-        for idx, low, adj_low in zip(down_source_Peaks.data['index'], down_source_Peaks.data['Low'], down_source_Peaks.data['ArrowTail']):
-            formatted_low = "${:0.2f}".format(low)  # Format the price
-            price_label = Label(x=idx, y=adj_low, text=formatted_low, text_font_size="8pt", text_color="red",
-                                text_baseline="top", text_align="center")
-            p.add_layout(price_label)
+    # Add consolidation boxes
+    change = df['Consol_Detected'].astype(int).diff().fillna(0) != 0
+    start_indices = df.index[change & (df['Consol_Detected'])].tolist()
+    end_indices = df.index[change & (~df['Consol_Detected'])].tolist() + [df.index[-1]]
+    start_indices = start_indices[:len(end_indices)]
 
-    # Draw rectangles for consolidation detection
-    if 'Consol_Detected' in df.columns and df['Consol_Detected'].notna().any():
-        change = df['Consol_Detected'].astype(int).diff().fillna(0) != 0
-        start_indices = df.index[change & (df['Consol_Detected'])].tolist()
-        # Check if the last value of 'Consol_Detected' is True, if so append the last index to end_indices
-        end_indices = df.index[change & (~df['Consol_Detected'])].tolist() + [df.index[-1]]  # Append the last index if the last segment is True
+    for end in end_indices:
+        right_side = end if end == df.index[-1] else end - 1
+        left_side = right_side - df.loc[right_side, 'Consol_Len_Bars'] - 1
+        top_side = df.loc[right_side, 'Consol_LHS_Price']
+        bottom_side = top_side - (top_side * df.loc[right_side, 'Consol_Depth_Percent'] / 100)
+        p.add_layout(BoxAnnotation(left=left_side, right=right_side, top=top_side, bottom=bottom_side, fill_alpha=0.4, fill_color='orange'))
 
-        # Ensure each start has an end
-        start_indices = start_indices[:len(end_indices)]
+    # Add moving averages
+    for ma, color in [('Close_21_bar_ema', 'green'), ('Close_50_bar_sma', 'red'), ('Close_150_bar_sma', 'blue'), ('Close_200_bar_sma', 'black')]:
+        p.line(df.index, df[ma], line_width=2, color=color, legend_label=ma.replace('Close_', '').replace('_', ' '))
 
-        for end in end_indices:
-            if end == df.index[-1]:
-                right_side = end      # If the last bar is the right side, include it.
-            else:    
-                right_side = end - 1  # Find the last bar where Consol_Detected is True
-            left_side = right_side - df.loc[right_side, 'Consol_Len_Bars'] - 1
-            top_side = df.loc[right_side, 'Consol_LHS_Price']
-            bottom_side = top_side - (top_side * df.loc[right_side, 'Consol_Depth_Percent'] / 100)
-            box = BoxAnnotation(left=left_side, right=right_side, top=top_side, bottom=bottom_side, fill_alpha=0.4, fill_color='orange')
+    # Add RSL
+    last_low = df['Low'].iloc[-1]
+    last_rsl = df['RSL'].iloc[-1]
+    desired_rsl_position = last_low * 0.8
+    rsl_scale_factor = desired_rsl_position / last_rsl
+    scaled_rsl = df['RSL'] * rsl_scale_factor
+    p.line(df.index, scaled_rsl, line_width=1, color='blue', legend_label='RSL')
 
-            p.add_layout(box)
+    # Add RSL New Highs
+    nh_indices = df.index[df['RSL_NH']].tolist()
+    nh_values = scaled_rsl[df['RSL_NH']]
+    colors = ['cyan' if consol else 'lightblue' for consol in df.loc[df['RSL_NH'], 'Consol_Detected']]
+    sizes = [10 if consol else 7 for consol in df.loc[df['RSL_NH'], 'Consol_Detected']]
+    p.scatter(nh_indices, nh_values, size=sizes, color=colors, alpha=0.8)
 
-    # Plot SMAs and EMAs
-    if 'Close_21_bar_ema' in df.columns and df['Close_21_bar_ema'].notna().any():
-        p.line(df.index, df['Close_21_bar_ema'], line_width=2, color='green', legend_label='21-day EMA')
-    if 'Close_50_bar_sma' in df.columns and df['Close_50_bar_sma'].notna().any():
-        p.line(df.index, df['Close_50_bar_sma'], line_width=2, color='red', legend_label='50-day SMA')
-    if 'Close_150_bar_sma' in df.columns and df['Close_150_bar_sma'].notna().any():
-        p.line(df.index, df['Close_150_bar_sma'], line_width=2, color='blue', legend_label='150-day SMA')
-    if 'Close_200_bar_sma' in df.columns and df['Close_200_bar_sma'].notna().any():
-        p.line(df.index, df['Close_200_bar_sma'], line_width=3, color='black', legend_label='200-day SMA')
-    
-    # Handle RSL and its scaling
-    if 'RSL' in df.columns and df['RSL'].notna().any():
-        last_low = df['Low'].iloc[-1]
-        last_rsl = df['RSL'].iloc[-1]
-        desired_rsl_position = last_low * 0.8
-        rsl_scale_factor = desired_rsl_position / last_rsl
-        scaled_rsl = df['RSL'] * rsl_scale_factor
-        p.line(df.index, scaled_rsl, line_width=1, color='blue', legend_label='RSL')
-
-    # Plotting dots at RSL New Highs using scatter, with color conditional on Consol_Detected
-    if 'RSL_NH' in df.columns and df['RSL_NH'].any():
-        # Extract indices and values where RSL_NH is true
-        nh_indices = df.index[df['RSL_NH']].tolist()
-        nh_values = scaled_rsl[df['RSL_NH']]
-
-        # Determine color based on Consol_Detected
-        colors = ['cyan' if consol else 'lightblue' for consol in df.loc[df['RSL_NH'], 'Consol_Detected']]
-
-        size = [10 if consol else 7 for consol in df.loc[df['RSL_NH'], 'Consol_Detected']]
-
-        nh_source = ColumnDataSource(data={
-            'x': nh_indices,
-            'y': nh_values,
-            'color': colors,  # Adding a color field to the data source
-            'size': size
-        })
-        p.scatter('x', 'y', size='size', color='color', alpha=0.8, source=nh_source)  # Use the color field for the color property
-
-
-    # Custom x-axis configuration
-    p.add_layout(LinearAxis(), 'below')
-    p.xaxis.ticker = SingleIntervalTicker(interval=1)
-    p.xaxis.formatter = CustomJSTickFormatter(code=f"""
-        var labels = {friday_labels};
-        return labels[tick] || '';
-    """)
-
-    # Assuming 'friday_labels' has indices of all Fridays
-    for index in friday_labels.keys():
-        friday_line = Span(location=index,  # the index of the Friday
-                           dimension='height',  # Line will span the full height of the plot
-                           line_color='grey',  # Color of the line
-                           line_dash='solid',  # Style of the line
-                           line_width=0.2)  # Width of the line
-        p.add_layout(friday_line)
-
-    p.xaxis.major_tick_line_color = 'Black'
-    p.xaxis.minor_tick_line_color = None
-    p.xaxis.major_label_orientation = 3.14/4  # 'vertical' or 3.14/4 for diagonal
-
-    # legend params
+    # Legend setup
     p.legend.location = 'top_left'
     p.legend.title = 'Legend'
     p.legend.title_text_font_style = "bold"
     p.legend.title_text_font_size = "12pt"
     p.legend.label_text_font_size = "10pt"
 
-    #GUI Controls
+    # Subplots setup
+    subplot_height = 150
+    subplot_params = [
+        ('Stage 2', 'green', 0, 1),
+        ('UpDownVolumeRatio', 'blue', None, None),
+        ('ATR', 'red', None, None),
+        ('%B', 'purple', 0, 1)
+    ]
+
+    subplots = []
+
+    for param, color, y_min, y_max in subplot_params:
+        sub_p = figure(x_range=p.x_range, height=subplot_height, title=param, sizing_mode="stretch_width", x_axis_type=None)
+        
+        if param == 'Stage 2':
+            sub_p.step(df.index, df[param], line_color=color, mode="after")
+        else:
+            sub_p.line(df.index, df[param], line_color=color)
+        
+        if y_min is not None and y_max is not None:
+            sub_p.y_range = Range1d(y_min, y_max)
+        
+        sub_p.xaxis.major_label_orientation = 3.14/4
+        
+        for index in friday_labels.keys():
+            sub_p.add_layout(Span(location=index, dimension='height', line_color='grey', line_dash='solid', line_width=0.2))
+        
+        subplots.append(sub_p)
+
+    # Add x-axis to the last subplot
+    subplots[-1].xaxis.ticker = SingleIntervalTicker(interval=1)
+    subplots[-1].xaxis.formatter = CustomJSTickFormatter(code=f"""
+        var labels = {friday_labels};
+        return labels[tick] || '';
+    """)
+
     # Create the input field
     ticker_input = TextInput(value="", title="Ticker Symbol:")
 
-
+    # Combine main plot and subplots
+    layout = column(p, *subplots, sizing_mode="stretch_width")
 
     # Display the plot
-    show(p)
+    show(layout)

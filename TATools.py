@@ -619,15 +619,15 @@ def get_stage2_uptrend(df):
 
     Parameters:
     df (pandas.DataFrame): DataFrame containing the stock's historical data.
-        The required columns are 'Close', '50_bar_sma', '150_bar_sma', '200_bar_sma', 'RS'.
+        The required columns are 'Close', 'Close_50_bar_sma', 'Close_150_bar_sma', 'Close_200_bar_sma'.
 
     Returns:
-    pandas.Series: A boolean Series indicating whether the stock is in a stage 2 uptrend.
+    pandas.DataFrame: The input DataFrame with an additional 'Stage 2' column indicating whether the stock is in a stage 2 uptrend.
     """
     # Check if all required columns exist
     required_columns = ['Close', 'Close_50_bar_sma', 'Close_150_bar_sma', 'Close_200_bar_sma']
-    if not all(column in df.columns for column in required_columns):
-        missing_cols = set(required_columns) - set(df.columns)
+    missing_cols = set(required_columns) - set(df.columns)
+    if missing_cols:
         raise ValueError(f"Missing required columns: {', '.join(missing_cols)}")
 
     # Calculate the 52 week low and high
@@ -635,22 +635,119 @@ def get_stage2_uptrend(df):
     df['52_week_high'] = df['Close'].rolling(window=252).max()
 
     # Define the stage 2 uptrend rules
-    rules = [
-        (df['Close_150_bar_sma'] > df['Close_200_bar_sma']),  # 1. 150 day SMA is above 200 day SMA
-        (df['Close_50_bar_sma'] > df['Close_150_bar_sma']),  # 2. 50 day SMA is above the 150 day SMA
-        (df['Close'] > df['Close_150_bar_sma']),  # 3. Closing price is above the 150 day SMA
-        (df['Close_200_bar_sma'].diff(21) > 0),  # 4. 200-day SMA is uptrending for at least one month (21 days)
-        ((df['Close'] - df['52_week_low']) / df['52_week_low'] > 0.25),  # 5. Closing price is at least 25% above the 52 week low
-        ((df['Close'] / df['52_week_high']) > 0.75),  # 6. Closing price is within 25% of the 52 week high
-    ]
+    rules = pd.DataFrame({
+        'Rule1': df['Close_150_bar_sma'] > df['Close_200_bar_sma'],
+        'Rule2': df['Close_50_bar_sma'] > df['Close_150_bar_sma'],
+        'Rule3': df['Close'] > df['Close_150_bar_sma'],
+        'Rule4': df['Close_200_bar_sma'].diff(21) > 0,
+        'Rule5': (df['Close'] - df['52_week_low']) / df['52_week_low'] > 0.25,
+        'Rule6': df['Close'] / df['52_week_high'] > 0.75
+    })
 
     # Combine all rules using logical AND operation
-    df['Stage 2'] = np.all(rules, axis=0)
+    df['Stage 2'] = rules.all(axis=1)
 
-    # Identify which rule(s) are failing
-    #for i, rule in enumerate(rules):
-    #    if not rule.iloc[-1]:  # Check the last row of the dataframe
-    #        print(f"Rule {i+1} failed: {rule.name}")
+    # Optional: Identify which rule(s) are failing (uncomment if needed)
+    # failing_rules = ~rules.iloc[-1]
+    # if failing_rules.any():
+    #     print("Failing rules:", ", ".join(failing_rules[failing_rules].index))
+
+    return df
+
+def calculate_up_down_volume_ratio(df, window=50):
+    """
+    Calculate the up/down volume ratio for the stock represented by the dataframe.
+
+    Parameters:
+    df (pandas.DataFrame): DataFrame containing the stock's historical data.
+        The required columns are 'Close' and 'Volume'.
+    window (int): The rolling window for calculation (default is 50 days).
+
+    Returns:
+    pandas.DataFrame: A DataFrame with a new column 'UpDownVolumeRatio' representing the up/down volume ratio.
+    """
+    # Check if all required columns exist
+    required_columns = ['Close', 'Volume']
+    if not all(column in df.columns for column in required_columns):
+        missing_cols = set(required_columns) - set(df.columns)
+        raise ValueError(f"Missing required columns: {', '.join(missing_cols)}")
+    
+    # Determine up days and down days
+    price_change = df['Close'].diff()
+    
+    # Calculate the total volume on up days and down days over the specified window
+    up_volume = df['Volume'].where(price_change > 0, 0)
+    down_volume = df['Volume'].where(price_change < 0, 0)
+    
+    up_volume_sum = up_volume.rolling(window=window).sum()
+    down_volume_sum = down_volume.rolling(window=window).sum()
+    
+    # Calculate ratio, handling division by zero
+    df['UpDownVolumeRatio'] = np.where(
+        down_volume_sum != 0,
+        up_volume_sum / down_volume_sum,
+        np.inf  # or you could use np.nan if you prefer
+    )
     
     return df
+
+def calculate_atr(df, period=14):
+    """
+    Calculate Average True Range (ATR) for a given stock
+
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing the stock's historical data
+            The required columns are 'High', 'Low', and 'Close'
+        period (int): The period over which to calculate ATR (default is 14)
+
+    Returns:
+        pandas.DataFrame: A new DataFrame with an additional column 'ATR' containing the calculated ATR values
+    """
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
     
+    # Calculate True Range
+    tr1 = high - low
+    tr2 = abs(high - close.shift())
+    tr3 = abs(low - close.shift())
+    
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    
+    # Calculate ATR
+    atr = tr.rolling(window=period).mean()
+    
+    # Add ATR to the dataframe
+    df['ATR'] = atr
+    
+    return df
+
+def calculate_pct_b(df):
+    """
+    Calculate Bollinger Bands (%B) for a given stock
+
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing the stock's historical data
+            The required columns are 'Close'
+
+    Returns:
+        pandas.DataFrame: A new DataFrame with an additional column '%B' containing the calculated %B values
+    """
+    close = df['Close']
+    window = 20
+    
+    # Calculate rolling mean and standard deviation
+    rolling_mean = close.rolling(window=window).mean()
+    rolling_std = close.rolling(window=window).std()
+    
+    # Calculate upper and lower Bollinger Bands
+    upper_band = rolling_mean + (rolling_std * 2)
+    lower_band = rolling_mean - (rolling_std * 2)
+    
+    # Calculate %B
+    bb_values = (close - lower_band) / (upper_band - lower_band)
+    
+    # Add %B to the dataframe
+    df['%B'] = bb_values
+    
+    return df

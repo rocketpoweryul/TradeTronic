@@ -38,6 +38,10 @@ if __name__ == '__main__':
     df = add_moving_average(df, 150, 'sma')
     df = add_moving_average(df, 200, 'sma')
     df = add_relative_strength_line(df)
+    df = get_stage2_uptrend(df)
+    df = calculate_up_down_volume_ratio(df)
+    df = calculate_atr(df)
+    df = calculate_pct_b(df)
 
     # Convert index to integers, but save dates as datestrings 
     df['DateString'] = df.index.strftime('%Y-%m-%d')  # Save date info before resetting index
@@ -93,6 +97,10 @@ if __name__ == '__main__':
     #df = update_stock_dataframe_with_rs(df, RS_LR, window=63)
     #df = get_stage2_uptrend(df)
 
+    print(df.head())
+
+    
+
     # Launch GUI
     #print("Launching GUI")
     Launch_GUI(df)
@@ -100,3 +108,7 @@ if __name__ == '__main__':
     # save df for inspection
     print("Saving df.csv")
     df.to_csv('data/df.csv')
+
+
+
+
