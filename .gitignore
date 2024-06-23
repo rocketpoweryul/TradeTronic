@@ -112,3 +112,4 @@ my_dir/
 labels.npy
 metadata.npy
 sequences.npy
+keras_tuner/
