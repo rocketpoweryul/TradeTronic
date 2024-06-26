@@ -11,9 +11,9 @@ from TATools import *
 # Configuration
 SEQUENCE_LENGTH = 63
 INPUT_FILE = 'data/us_equities_data.csv'
-OUTPUT_SEQ_FILE = 'sequences.npy'
-OUTPUT_LABELS_FILE = 'labels.npy'
-OUTPUT_METADATA_FILE = 'metadata.npy'
+OUTPUT_SEQ_FILE = 'data/sequences.npy'
+OUTPUT_LABELS_FILE = 'data/labels.npy'
+OUTPUT_METADATA_FILE = 'data/metadata.npy'
 OUTPUT_CSV_FILE = 'log/TrainingLog.csv'
 MAX_WORKERS = min(11, os.cpu_count() - 1)
 
