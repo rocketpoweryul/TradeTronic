@@ -1,25 +1,14 @@
-import csv
-import numpy as np
 import pandas as pd
+import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import os
-import multiprocessing
-import time
-import random
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy import stats
 
-# Import functions from TATools
-from TATools import (fetch_OHLCV, find_swing_high_and_lows, filter_swing_high_and_lows,
-                     filter_peaks, detect_consolidation, add_moving_average,
-                     add_relative_strength_line, get_stage2_uptrend,
-                     calculate_up_down_volume_ratio, calculate_atr, calculate_pct_b)
+# Import functions from your libraries
+from NorgateInterface import fetch_OHLCV
+from TATools import *
 
-from GUI import *
-
-# Configuration and hyperparameters
+# Configuration
 SEQUENCE_LENGTH = 63
 INPUT_FILE = 'data/us_equities_data.csv'
 OUTPUT_SEQ_FILE = 'sequences.npy'
@@ -28,57 +17,27 @@ OUTPUT_METADATA_FILE = 'metadata.npy'
 OUTPUT_CSV_FILE = 'log/TrainingLog.csv'
 MAX_WORKERS = min(11, os.cpu_count() - 1)
 
-def calculate_consolidation_stats(df):
-    """Calculate consolidation length and depth."""
-    consol_lengths = []
-    consol_depths = []
-    current_consol_start = None
-    
-    for i, row in df.iterrows():
-        if row['Consol_Detected'] and current_consol_start is None:
-            current_consol_start = i
-        elif not row['Consol_Detected'] and current_consol_start is not None:
-            length = (i - current_consol_start).days
-            depth = (df.loc[current_consol_start:i, 'High'].max() - df.loc[current_consol_start:i, 'Low'].min()) / df.loc[current_consol_start, 'Close']
-            consol_lengths.append(length)
-            consol_depths.append(depth)
-            current_consol_start = None
-    
-    return consol_lengths, consol_depths
+def calculate_price_distance(df, column):
+    """Calculate percentage distance of closing price to a moving average."""
+    return (df['Close'] / df[column] - 1) * 100
 
-def count_rsl_nh(sequence):
-    """Count RSL_NH occurrences in a sequence."""
-    return sum(1 for row in sequence if row[-1] == 1)  # Assuming RSL_NH is the last column
+def count_rsl_nh(df):
+    """Count cumulative RSL_NH occurrences."""
+    return df['RSL_NH'].cumsum()
 
-def log_statistics(data, name):
-    """Log statistics for a given dataset."""
-    print(f"\n{name} Statistics:")
-    print(f"Count: {len(data)}")
-    print(f"Mean: {np.mean(data)}")
-    print(f"Median: {np.median(data)}")
-    print(f"Standard Deviation: {np.std(data)}")
-    print(f"Variance: {np.var(data)}")
-    print(f"Min: {np.min(data)}")
-    print(f"Max: {np.max(data)}")
+def calculate_rsl_slope(df, window=10):
+    """Calculate RSL slope based on the last 10 days."""
+    return df['RSL'].diff(periods=window) / window
 
-def plot_distribution(data, name, filename):
-    """Plot and save distribution of data."""
-    plt.figure(figsize=(10, 6))
-    sns.histplot(data, kde=True)
-    plt.title(f"Distribution of {name}")
-    plt.xlabel(name)
-    plt.ylabel("Frequency")
-    plt.savefig(filename)
-    plt.close()
+def count_up_down_days(df, window=14):
+    """Count up days vs down days in closing price over the last 14 days."""
+    return df['Close'].diff().rolling(window=window).apply(lambda x: np.sum(x > 0) - np.sum(x < 0))
 
 def process_symbol(symbol):
-    """Process a single stock symbol to generate sequences, profits, and metadata."""
     try:
-        start_time = time.time()
-
         df = fetch_OHLCV(symbol, num_bars=None, interval='D')
         if df is None or df.empty:
-            return [], [], [], [], [], []
+            return [], [], []
 
         # Apply technical analysis
         df = find_swing_high_and_lows(df)
@@ -95,120 +54,96 @@ def process_symbol(symbol):
         df = calculate_atr(df)
         df = calculate_pct_b(df)
 
+        # Add new features
+        df['Distance_to_21EMA'] = calculate_price_distance(df, 'Close_21_bar_ema')
+        df['Distance_to_50SMA'] = calculate_price_distance(df, 'Close_50_bar_sma')
+        df['Distance_to_200SMA'] = calculate_price_distance(df, 'Close_200_bar_sma')
+        df['RSL_NH_Count'] = count_rsl_nh(df)
+        df['RSL_Slope'] = calculate_rsl_slope(df)
+        df['Up_Down_Days'] = count_up_down_days(df)
+
         symbol_sequences = []
         symbol_profits = []
         symbol_metadata = []
-        symbol_consol_lengths, symbol_consol_depths = calculate_consolidation_stats(df)
-        symbol_rsl_nh_counts = []
 
-        for index in range(len(df) - 1):
-            if not df['Consol_Detected'].iloc[index] or df['Consol_Detected'].iloc[index + 1]:
-                continue
-
-            consol_lhs_price = df['Consol_LHS_Price'].iloc[index]
-            start_index = max(0, index - SEQUENCE_LENGTH + 1)
-            
-            seq = df.iloc[start_index:index + 1].values.tolist()
-            if len(seq) < SEQUENCE_LENGTH:
-                padding = [[0] * len(df.columns)] * (SEQUENCE_LENGTH - len(seq))
-                seq = padding + seq
-            
-            for i in range(index + 1, len(df) - 2):
-                if not (df['Close'].iloc[i] < df['Close_50_bar_sma'].iloc[i] and 
-                        df['Close'].iloc[i + 1] < df['Close_50_bar_sma'].iloc[i + 1] and 
-                        df['Close'].iloc[i + 2] < df['Close_50_bar_sma'].iloc[i + 2]):
-                    continue
-
-                profit = df['Close'].iloc[i + 2] / consol_lhs_price - 1
+        for i in range(len(df) - 1):
+            # Check if this is the day of a breakout (last day Consol_Detected is true)
+            if df['Consol_Detected'].iloc[i] and not df['Consol_Detected'].iloc[i + 1]:
+                consol_lhs_price = df['Consol_LHS_Price'].iloc[i]
                 
-                symbol_sequences.append(seq)
-                symbol_profits.append(profit)
-                symbol_metadata.append([symbol, df.index[index + 1].strftime('%Y-%m-%d')])  # Use index for date
-                symbol_rsl_nh_counts.append(count_rsl_nh(seq))
-                break
+                # The sequence ends the day before the breakout
+                end_date = df.index[i - 1]
+                start_date = df.index[max(0, i - SEQUENCE_LENGTH)]
+                
+                # Select features for the sequence
+                feature_columns = ['Consol_Len_Bars', 'Consol_Depth_Percent',
+                                   'Distance_to_21EMA', 'Distance_to_50SMA', 'Distance_to_200SMA', 
+                                   'RSL_NH_Count', 'RSL_Slope', 'Up_Down_Days', 
+                                   'Stage 2', 'UpDownVolumeRatio', 'ATR', '%B']
+                
+                seq = df.loc[start_date:end_date, feature_columns].values.tolist()
+                if len(seq) < SEQUENCE_LENGTH:
+                    padding = [[0] * len(feature_columns)] * (SEQUENCE_LENGTH - len(seq))
+                    seq = padding + seq
+                
+                # Check for the 50-day rule starting from the day after the breakout
+                for j in range(i + 1, len(df) - 2):
+                    if not (df['Distance_to_50SMA'].iloc[j] < 0 and 
+                            df['Distance_to_50SMA'].iloc[j + 1] < 0 and 
+                            df['Distance_to_50SMA'].iloc[j + 2] < 0):
+                        continue
 
-        end_time = time.time()
-        return symbol_sequences, symbol_profits, symbol_metadata, symbol_consol_lengths, symbol_consol_depths, symbol_rsl_nh_counts
+                    profit = df['Close'].iloc[j + 2] / consol_lhs_price - 1
+                    
+                    symbol_sequences.append(seq)
+                    symbol_profits.append(profit)
+                    symbol_metadata.append([symbol, end_date.strftime('%Y-%m-%d')])
+                    break
+
+        return symbol_sequences, symbol_profits, symbol_metadata
 
     except Exception as e:
         print(f"Error processing symbol {symbol}: {e}")
-        return [], [], [], [], [], []
-
-def load_sec_list(filename):
-    """Load the list of securities from a CSV file."""
-    try:
-        df = pd.read_csv(filename)
-        sec_list = df.iloc[:, 0].tolist()
-        if not sec_list:
-            raise ValueError("No securities found in the input file")
-        return sec_list
-    except Exception as e:
-        print(f"Error loading securities list: {e}")
-        return []
-
-def save_data(sequences, profits, metadata):
-    """Save processed data to files."""
-    np.save(OUTPUT_SEQ_FILE, sequences)
-    np.save(OUTPUT_LABELS_FILE, profits)
-    np.save(OUTPUT_METADATA_FILE, metadata)
-
-    combined_data = [[meta[0], meta[1], profit] for meta, profit in zip(metadata, profits)]
-    pd.DataFrame(combined_data, columns=['Symbol', 'Date', 'Profit']).to_csv(OUTPUT_CSV_FILE, index=False)
+        return [], [], []
 
 def main():
-    print("Accessing list of securities...")
-    try:
-        print(f"Loading {INPUT_FILE} file")
-        sec_list = load_sec_list(INPUT_FILE)
-        print(f"Total securities: {len(sec_list)}")
+    print("Loading securities...")
+    securities = pd.read_csv(INPUT_FILE)['symbol'].tolist()
+    print(f"Total securities: {len(securities)}")
 
-        all_sequences = []
-        all_profits = []
-        all_metadata = []
-        all_consol_lengths = []
-        all_consol_depths = []
-        all_rsl_nh_counts = []
+    all_sequences = []
+    all_profits = []
+    all_metadata = []
 
-        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = {executor.submit(process_symbol, symbol): symbol for symbol in sec_list}
-            
-            for future in tqdm(as_completed(futures), total=len(sec_list), desc="Processing symbols"):
-                symbol = futures[future]
-                try:
-                    symbol_sequences, symbol_profits, symbol_metadata, symbol_consol_lengths, symbol_consol_depths, symbol_rsl_nh_counts = future.result()
-                    all_sequences.extend(symbol_sequences)
-                    all_profits.extend(symbol_profits)
-                    all_metadata.extend(symbol_metadata)
-                    all_consol_lengths.extend(symbol_consol_lengths)
-                    all_consol_depths.extend(symbol_consol_depths)
-                    all_rsl_nh_counts.extend(symbol_rsl_nh_counts)
-                except Exception as exc:
-                    print(f'{symbol} generated an exception: {exc}')
+    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(process_symbol, symbol): symbol for symbol in securities}
+        
+        for future in tqdm(as_completed(futures), total=len(securities), desc="Processing symbols"):
+            symbol = futures[future]
+            try:
+                symbol_sequences, symbol_profits, symbol_metadata = future.result()
+                all_sequences.extend(symbol_sequences)
+                all_profits.extend(symbol_profits)
+                all_metadata.extend(symbol_metadata)
+            except Exception as exc:
+                print(f'{symbol} generated an exception: {exc}')
 
-        if not all_sequences or not all_profits or not all_metadata:
-            raise ValueError("No valid data processed")
+    if not all_sequences or not all_profits or not all_metadata:
+        raise ValueError("No valid data processed")
 
-        sequences_array = np.array(all_sequences)
-        profits_array = np.array(all_profits)
+    sequences_array = np.array(all_sequences)
+    profits_array = np.array(all_profits)
+    metadata_array = np.array(all_metadata)
 
-        save_data(sequences_array, profits_array, all_metadata)
+    # Save data
+    np.save(OUTPUT_SEQ_FILE, sequences_array)
+    np.save(OUTPUT_LABELS_FILE, profits_array)
+    np.save(OUTPUT_METADATA_FILE, metadata_array)
 
-        # Log statistics
-        log_statistics(all_profits, "Profit Distribution")
-        log_statistics(all_consol_lengths, "Consolidation Length")
-        log_statistics(all_consol_depths, "Consolidation Depth")
-        log_statistics(all_rsl_nh_counts, "RSL_NH Occurrences")
+    # Save CSV log
+    pd.DataFrame(all_metadata, columns=['Symbol', 'Date']).assign(Profit=all_profits).to_csv(OUTPUT_CSV_FILE, index=False)
 
-        # Plot distributions
-        plot_distribution(all_profits, "Profit Distribution", "profit_distribution.png")
-        plot_distribution(all_consol_lengths, "Consolidation Length", "consolidation_length_distribution.png")
-        plot_distribution(all_consol_depths, "Consolidation Depth", "consolidation_depth_distribution.png")
-        plot_distribution(all_rsl_nh_counts, "RSL_NH Occurrences", "rsl_nh_occurrences_distribution.png")
-
-        print("Data processing completed successfully.")
-
-    except Exception as e:
-        print(f"Error in main execution: {e}")
+    print("Data processing completed successfully.")
 
 if __name__ == '__main__':
     main()

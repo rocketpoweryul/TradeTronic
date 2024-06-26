@@ -121,6 +121,7 @@ def Launch_GUI(df):
     subplot_height = 150
     subplot_params = [
         ('Stage 2', 'green', 0, 1),
+        ('Consol_Detected', 'orange', 0, 1),  # Added Consol_Detected
         ('UpDownVolumeRatio', 'blue', None, None),
         ('ATR', 'red', None, None),
         ('%B', 'purple', 0, 1)
@@ -131,7 +132,7 @@ def Launch_GUI(df):
     for param, color, y_min, y_max in subplot_params:
         sub_p = figure(x_range=p.x_range, height=subplot_height, title=param, sizing_mode="stretch_width", x_axis_type=None)
         
-        if param == 'Stage 2':
+        if param in ['Stage 2', 'Consol_Detected']:  # Modified to include Consol_Detected
             sub_p.step(df.index, df[param], line_color=color, mode="after")
         else:
             sub_p.line(df.index, df[param], line_color=color)
