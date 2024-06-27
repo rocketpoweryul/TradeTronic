@@ -39,6 +39,11 @@ def process_symbol(symbol):
         if df is None or df.empty:
             return [], [], []
 
+        # Check if any OHLC value is above $3000
+        if (df[['Open', 'High', 'Low', 'Close']] > 3000).any().any():
+            print(f"Skipping {symbol} due to price above $3000")
+            return [], [], []
+
         # Apply technical analysis
         df = find_swing_high_and_lows(df)
         df = filter_swing_high_and_lows(df)
