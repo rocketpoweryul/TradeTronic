@@ -105,10 +105,13 @@ Desktop.ini
 .directory
 
 # custom
-y_SysInt_Tests.html
-df.csv
-df.xlsx
-relative_strength_ranks.csv
-RS_LR.csv
-us_equities_data.csv
-y_SysInt_Tests.html
+data/
+my_dir/
+*.h5
+*.keras
+labels.npy
+metadata.npy
+sequences.npy
+keras_tuner/
+log/
+mlruns/

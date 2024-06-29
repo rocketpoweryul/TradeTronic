@@ -1,4 +1,8 @@
 # open source modules
+import sys
+print(sys.executable)
+print(sys.path)
+
 import pandas as pd
 import os
 import csv
@@ -10,7 +14,7 @@ from GUI              import *
 
 # perform daily maintenance on data stored to disk
 update_useq = False
-update_RS   = True
+update_RS   = False
 
 # clear terminal
 os.system('cls')
@@ -22,7 +26,7 @@ pd.set_option('display.width',          2000)
 
 if __name__ == '__main__':
     # get the data from Norgate
-    df = fetch_OHLCV(symbol = 'DELL', num_bars = 300, interval = 'D')
+    df = fetch_OHLCV(symbol = 'DELL', num_bars = 252*2, interval = 'D')
 
     ## Initial stock dataframe processeing
     df = find_swing_high_and_lows(df)
@@ -34,6 +38,10 @@ if __name__ == '__main__':
     df = add_moving_average(df, 150, 'sma')
     df = add_moving_average(df, 200, 'sma')
     df = add_relative_strength_line(df)
+    df = get_stage2_uptrend(df)
+    df = calculate_up_down_volume_ratio(df)
+    df = calculate_atr(df)
+    df = calculate_pct_b(df)
 
     # Convert index to integers, but save dates as datestrings 
     df['DateString'] = df.index.strftime('%Y-%m-%d')  # Save date info before resetting index
@@ -48,7 +56,7 @@ if __name__ == '__main__':
         us_equities_data = get_us_equities_data()
         sec_list = []
 
-        with open('us_equities_data.csv', 'w', newline='') as f:
+        with open('data/us_equities_data.csv', 'w', newline='') as f:
             print("Saving us_equities_data.csv file")
             fieldnames = ['symbol', 'Security Name', 'domicile', 'Short Exchange Name', 'GICS Sector', 'GICS Industry']
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -60,7 +68,7 @@ if __name__ == '__main__':
         # Open the CSV file
         sec_list = []
         print("Loading us_equities_data.csv file")
-        with open('us_equities_data.csv', 'r') as f:
+        with open('data/us_equities_data.csv', 'r') as f:
             
             reader = csv.reader(f)
 
@@ -80,19 +88,27 @@ if __name__ == '__main__':
         
         # Save the DataFrame to a CSV file using to_csv method
         print("Saving RS.csv file")
-        RS_LR.to_csv('RS.csv', index=True, header=True)
+        RS_LR.to_csv('data/RS.csv', index=True, header=True)
     else:
         # Load the DataFrame from a CSV file using pandas
         print("Loading RS.csv file")
-        RS_LR = pd.read_csv('RS.csv', index_col=0)
+        RS_LR = pd.read_csv('data/RS.csv', index_col=0)
 
     #df = update_stock_dataframe_with_rs(df, RS_LR, window=63)
     #df = get_stage2_uptrend(df)
 
+    print(df.head())
+
+    
+
     # Launch GUI
     #print("Launching GUI")
-    #Launch_GUI(df)
+    Launch_GUI(df)
 
     # save df for inspection
     print("Saving df.csv")
-    df.to_csv('df.csv')
+    df.to_csv('data/df.csv')
+
+
+
+
