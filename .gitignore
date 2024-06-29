@@ -114,3 +114,4 @@ metadata.npy
 sequences.npy
 keras_tuner/
 log/
+mlruns/
