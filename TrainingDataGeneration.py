@@ -3,6 +3,7 @@ import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import os
+import json
 
 # Import functions from your libraries
 from NorgateInterface import fetch_OHLCV
@@ -16,6 +17,16 @@ OUTPUT_LABELS_FILE = 'data/labels.npy'
 OUTPUT_METADATA_FILE = 'data/metadata.npy'
 OUTPUT_CSV_FILE = 'log/TrainingLog.csv'
 MAX_WORKERS = min(11, os.cpu_count() - 1)
+
+# Select features for the sequence
+feature_columns = ['Consol_Len_Bars', 'Consol_Depth_Percent',
+                    'Distance_to_21EMA', 'Distance_to_50SMA', 'Distance_to_200SMA', 
+                    'RSL_NH_Count', 'RSL_Slope', 'Up_Down_Days', 
+                    'Stage 2', 'UpDownVolumeRatio', 'ATR', '%B',
+                    'ADR',  'U/D Ratio',  'BaseCount']
+
+with open('data/feature_columns.json', 'w') as f:
+    json.dump(feature_columns, f)
 
 def calculate_price_distance(df, column):
     """Calculate percentage distance of closing price to a moving average."""
@@ -33,7 +44,7 @@ def count_up_down_days(df, window=14):
     """Count up days vs down days in closing price over the last 14 days."""
     return df['Close'].diff().rolling(window=window).apply(lambda x: np.sum(x > 0) - np.sum(x < 0))
 
-def process_symbol(symbol):
+def process_symbol(symbol, feature_columns):
     try:
         df = fetch_OHLCV(symbol, num_bars=None, interval='D')
         if df is None or df.empty:
@@ -58,6 +69,10 @@ def process_symbol(symbol):
         df = calculate_up_down_volume_ratio(df)
         df = calculate_atr(df)
         df = calculate_pct_b(df)
+        df = calculate_adr(df)
+        df = calculate_up_down_ratio(df)
+        df = add_base_count(df)
+
 
         # Add new features
         df['Distance_to_21EMA'] = calculate_price_distance(df, 'Close_21_bar_ema')
@@ -79,12 +94,6 @@ def process_symbol(symbol):
                 # The sequence ends the day before the breakout
                 end_date = df.index[i - 1]
                 start_date = df.index[max(0, i - SEQUENCE_LENGTH)]
-                
-                # Select features for the sequence
-                feature_columns = ['Consol_Len_Bars', 'Consol_Depth_Percent',
-                                   'Distance_to_21EMA', 'Distance_to_50SMA', 'Distance_to_200SMA', 
-                                   'RSL_NH_Count', 'RSL_Slope', 'Up_Down_Days', 
-                                   'Stage 2', 'UpDownVolumeRatio', 'ATR', '%B']
                 
                 seq = df.loc[start_date:end_date, feature_columns].values.tolist()
                 if len(seq) < SEQUENCE_LENGTH:
@@ -116,12 +125,16 @@ def main():
     securities = pd.read_csv(INPUT_FILE)['symbol'].tolist()
     print(f"Total securities: {len(securities)}")
 
+    # Load feature column names
+    with open('data/feature_columns.json', 'r') as f:
+        feature_columns = json.load(f)
+
     all_sequences = []
     all_profits = []
     all_metadata = []
 
     with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(process_symbol, symbol): symbol for symbol in securities}
+        futures = {executor.submit(process_symbol, symbol, feature_columns): symbol for symbol in securities}
         
         for future in tqdm(as_completed(futures), total=len(securities), desc="Processing symbols"):
             symbol = futures[future]

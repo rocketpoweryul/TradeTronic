@@ -751,3 +751,148 @@ def calculate_pct_b(df):
     df['%B'] = bb_values
     
     return df
+
+def calculate_williams_r(df, period=14):
+    """
+    Calculate Williams %R indicator for a given stock
+
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing the stock's historical data
+            The required columns are 'High', 'Low', and 'Close'
+        period (int): The lookback period for calculating Williams %R (default is 14)
+
+    Returns:
+        pandas.DataFrame: A new DataFrame with an additional column 'Williams %R' containing the calculated Williams %R values
+    """
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
+    
+    # Calculate highest high and lowest low over the specified period
+    highest_high = high.rolling(window=period).max()
+    lowest_low = low.rolling(window=period).min()
+    
+    # Calculate Williams %R
+    williams_r = ((highest_high - close) / (highest_high - lowest_low)) * -100
+    
+    # Add Williams %R to the dataframe
+    df['Williams %R'] = williams_r
+    
+    return df
+
+def calculate_adr(df, period=20):
+    """
+    Calculate Average Daily Range (ADR) indicator for a given stock
+
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing the stock's historical data
+            The required columns are 'High' and 'Low'
+        period (int): The period for calculating the moving average (default is 20)
+
+    Returns:
+        pandas.DataFrame: A new DataFrame with an additional column 'ADR' containing the calculated ADR values
+    """
+    high = df['High']
+    low = df['Low']
+    
+    # Calculate daily range ratio
+    daily_range_ratio = high / low
+    
+    # Calculate moving average of daily range ratio
+    ma_daily_range_ratio = daily_range_ratio.rolling(window=period).mean()
+    
+    # Calculate ADR
+    adr = 100 * (ma_daily_range_ratio - 1)
+    
+    # Add ADR to the dataframe
+    df['ADR'] = adr
+    
+    return df
+
+def calculate_up_down_ratio(df, period=50):
+    """
+    Calculate Up/Down Volume Ratio for a given stock
+
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing the stock's historical data
+            The required columns are 'Close' and 'Volume'
+        period (int): The period for calculating the sum of up and down volume (default is 50)
+
+    Returns:
+        pandas.DataFrame: A new DataFrame with an additional column 'U/D Ratio' containing the calculated Up/Down Volume Ratio values
+    """
+    close = df['Close']
+    volume = df['Volume']
+    
+    # Calculate up days and down days
+    upday = close > close.shift(1)
+    downday = ~upday
+    
+    # Calculate up volume and down volume
+    upvol = (upday * volume).rolling(window=period).sum()
+    downvol = (downday * volume).rolling(window=period).sum()
+    
+    # Calculate U/D ratio (SafeDivide equivalent)
+    udratio = np.where(downvol != 0, upvol / downvol, np.inf)
+    
+    # Add U/D Ratio to the dataframe
+    df['U/D Ratio'] = udratio
+    
+    return df
+
+def add_base_count(df):
+    """
+    Add a BaseCount column to the DataFrame, counting the streak of subsequently higher consolidations.
+    The base count resets when a new consolidation undercuts the low of the previous base.
+
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing the stock's historical data with consolidation information.
+            Required columns: 'Consol_Detected', 'Consol_LHS_Price', 'Consol_Depth_Percent', 'Low'
+
+    Returns:
+        pandas.DataFrame: The input DataFrame with an additional 'BaseCount' column.
+    """
+    # Check if required columns exist
+    required_columns = ['Consol_Detected', 'Consol_LHS_Price', 'Consol_Depth_Percent', 'Low']
+    if not all(col in df.columns for col in required_columns):
+        raise ValueError(f"DataFrame must contain columns: {', '.join(required_columns)}")
+
+    # Initialize variables
+    base_count = 0
+    last_base_lhs = 0
+    last_base_low = 0
+    current_base_low = 0
+    base_counts = []
+    in_consolidation = False
+
+    for _, row in df.iterrows():
+        if row['Consol_Detected']:
+            current_lhs = row['Consol_LHS_Price']
+            current_base_low = current_lhs * (1 - row['Consol_Depth_Percent'] / 100)
+            
+            if not in_consolidation:
+                # Start of a new consolidation
+                if base_count == 0 or current_lhs >= last_base_lhs:
+                    base_count += 1
+                else:
+                    base_count = 1
+                
+                in_consolidation = True
+            else:               
+                # Check if current low undercuts the last completed base's low
+                if row['Low'] < last_base_low:
+                    base_count = 1
+                    last_base_lhs = current_lhs
+                    last_base_low = current_base_low
+        else:
+            if in_consolidation:
+                # End of a consolidation
+                last_base_low = current_base_low
+                in_consolidation = False
+
+        base_counts.append(base_count)
+
+    # Add BaseCount column to the DataFrame
+    df['BaseCount'] = base_counts
+
+    return df

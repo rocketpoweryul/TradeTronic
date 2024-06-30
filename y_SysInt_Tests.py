@@ -13,7 +13,7 @@ from TATools          import *
 from GUI              import *
 
 # perform daily maintenance on data stored to disk
-update_useq = False
+update_useq = True
 update_RS   = False
 
 # clear terminal
@@ -26,7 +26,7 @@ pd.set_option('display.width',          2000)
 
 if __name__ == '__main__':
     # get the data from Norgate
-    df = fetch_OHLCV(symbol = 'DELL', num_bars = 252*2, interval = 'D')
+    df = fetch_OHLCV(symbol = 'NVDA', num_bars = 252*2, interval = 'D')
 
     ## Initial stock dataframe processeing
     df = find_swing_high_and_lows(df)
@@ -42,6 +42,10 @@ if __name__ == '__main__':
     df = calculate_up_down_volume_ratio(df)
     df = calculate_atr(df)
     df = calculate_pct_b(df)
+    df = calculate_williams_r(df)
+    df = calculate_adr(df)
+    df = calculate_up_down_ratio(df)
+    df = add_base_count(df)
 
     # Convert index to integers, but save dates as datestrings 
     df['DateString'] = df.index.strftime('%Y-%m-%d')  # Save date info before resetting index
