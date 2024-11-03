@@ -67,8 +67,8 @@ def Launch_GUI(df):
     p.vbar('index', width=0.7, top='Open', bottom='Close', fill_color='color', line_color='color', source=source)
 
     # Add arrows
-    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_SwHL))
-    p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_SwHL))
+    # p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_SwHL))
+    # p.add_layout(Arrow(end=VeeHead(size=10), line_color="black", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_SwHL))
     p.add_layout(Arrow(end=VeeHead(size=14), line_color="orange", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=up_source_Peaks))
     p.add_layout(Arrow(end=VeeHead(size=14), line_color="orange", x_start='index', y_start='ArrowTail', x_end='index', y_end='ArrowTip', source=down_source_Peaks))
 
@@ -98,7 +98,7 @@ def Launch_GUI(df):
     # Add RSL
     last_low = df['Low'].iloc[-1]
     last_rsl = df['RSL'].iloc[-1]
-    desired_rsl_position = last_low * 0.8
+    desired_rsl_position = last_low * 0.6
     rsl_scale_factor = desired_rsl_position / last_rsl
     scaled_rsl = df['RSL'] * rsl_scale_factor
     p.line(df.index, scaled_rsl, line_width=1, color='blue', legend_label='RSL')
@@ -128,7 +128,9 @@ def Launch_GUI(df):
         ('Williams %R', 'brown', -100, 0),  # New subplot for Williams %R
         ('ADR', 'teal', None, None),  # New subplot for ADR
         ('U/D Ratio', 'magenta', None, None),  # New subplot for Up/Down Ratio
-        ('BaseCount', 'gold', 0, None)  # New subplot for BaseCount
+        ('BaseCount', 'gold', 0, None),  # New subplot for BaseCount
+        ('Beta', 'brown', 0, None),  # New subplot for Beta
+        ('OBV', 'red', 0, None)  # New subplot for OBV
     ]
 
     subplots = []

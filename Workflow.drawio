@@ -1,0 +1,172 @@
+<mxfile host="app.diagrams.net" modified="2024-08-29T05:35:44.138Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0" etag="lcL-V28xjYnc4IZVUBub" version="24.0.8" type="device">
+  <diagram name="Page-1" id="XB3S_wZJKy9Dn3ZL_UOl">
+    <mxGraphModel dx="4220" dy="1591" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="E50cbukwqj_svzYrhz0v-15" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-1" target="E50cbukwqj_svzYrhz0v-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-6" value="PowerAutomate" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="102" width="270" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-1" value="Download Screens from IBD Stock Screener" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-6">
+          <mxGeometry x="30" y="130" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-8" value="Download earnings data from Zacks.com" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-6">
+          <mxGeometry x="30" y="210" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-9" value="Download SmartSelect Ratings from IBD" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-6">
+          <mxGeometry x="30" y="50" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-10" target="E50cbukwqj_svzYrhz0v-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-10" value="Norgate EOD API" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="472" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-11" value="Deterministic Processing" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="402" y="102" width="250" height="528" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-12" value="Screen Ranking" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-11">
+          <mxGeometry x="20" y="130" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-13" value="Earnings and Sales Analysis" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-11">
+          <mxGeometry x="20" y="210" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-16" value="Earnings and Sales Analysis" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-11">
+          <mxGeometry x="20" y="290" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-17" value="Universe filtering" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-11">
+          <mxGeometry x="20" y="50" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-14" value="Technical Analysis" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-11">
+          <mxGeometry x="20" y="370" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-56" value="Market Analysis" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-11">
+          <mxGeometry x="20" y="453" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-9" target="E50cbukwqj_svzYrhz0v-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-8" target="E50cbukwqj_svzYrhz0v-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-8" target="E50cbukwqj_svzYrhz0v-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-26" value="" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-22" target="E50cbukwqj_svzYrhz0v-34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-22" value="Weekly Buy List" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" vertex="1" parent="1">
+          <mxGeometry x="452" y="680" width="150" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-11" target="E50cbukwqj_svzYrhz0v-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-30" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Weekly Workflow&lt;/h1&gt;&lt;div&gt;Performed after Friday EOD data is available, including indexes for overall market health&lt;/div&gt;" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="680" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-32" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Daily Workflow&lt;/h1&gt;&lt;p&gt;Analyze Weekly Buy List for actionable stocks. Set buy points, stop points, recommended net liquidity. Keep track of open paper and real trades.&lt;/p&gt;" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="730" width="260" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-34" value="Pre-Day Analysis" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="880" width="260" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-29" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="E50cbukwqj_svzYrhz0v-34" source="E50cbukwqj_svzYrhz0v-24" target="E50cbukwqj_svzYrhz0v-28">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-24" value="Daily Trading Plan" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-34">
+          <mxGeometry x="70" y="140" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-27" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="E50cbukwqj_svzYrhz0v-34" source="E50cbukwqj_svzYrhz0v-25" target="E50cbukwqj_svzYrhz0v-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-25" value="Consolidation Detection" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-34">
+          <mxGeometry x="25" y="40" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-28" value="DTP Images" style="shape=dataStorage;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-34">
+          <mxGeometry x="57.5" y="270" width="145" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-35" value="Post-Day Analysis" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="392" y="880" width="270" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-37" value="Trigger Detection" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-35">
+          <mxGeometry x="30" y="50" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-43" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="E50cbukwqj_svzYrhz0v-35" source="E50cbukwqj_svzYrhz0v-39" target="E50cbukwqj_svzYrhz0v-42">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-39" value="Trade Status Analysis" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-35">
+          <mxGeometry x="30" y="150" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-42" value="Stop/Sell Guidance" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-35">
+          <mxGeometry x="30" y="250" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-33" value="Open Paper Trades" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" vertex="1" parent="1">
+          <mxGeometry x="750" y="880" width="140" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-38" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-37" target="E50cbukwqj_svzYrhz0v-33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-40" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.99;entryY=0.617;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-33" target="E50cbukwqj_svzYrhz0v-39">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-41" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.363;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-24" target="E50cbukwqj_svzYrhz0v-37">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="390" y="970" as="sourcePoint" />
+            <mxPoint x="440" y="920" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-44" value="Real Portfolio Analysis" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="45" y="1310" width="260" height="570" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-51" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="E50cbukwqj_svzYrhz0v-44" source="E50cbukwqj_svzYrhz0v-45" target="E50cbukwqj_svzYrhz0v-46">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-45" value="IBKR Input API" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-44">
+          <mxGeometry x="25" y="50" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-52" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="E50cbukwqj_svzYrhz0v-44" source="E50cbukwqj_svzYrhz0v-46" target="E50cbukwqj_svzYrhz0v-48">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-46" value="Portfolio Data" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-44">
+          <mxGeometry x="30" y="140" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-47" value="Risk Analysis" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-44">
+          <mxGeometry x="30" y="230" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-53" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="E50cbukwqj_svzYrhz0v-44" source="E50cbukwqj_svzYrhz0v-48" target="E50cbukwqj_svzYrhz0v-49">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-48" value="Open Heat Conclusions" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-44">
+          <mxGeometry x="30" y="310" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-55" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="E50cbukwqj_svzYrhz0v-44" source="E50cbukwqj_svzYrhz0v-49" target="E50cbukwqj_svzYrhz0v-54">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-49" value="Set Bracket Orders" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-44">
+          <mxGeometry x="30" y="394" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-54" value="IBKR Output API" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="E50cbukwqj_svzYrhz0v-44">
+          <mxGeometry x="30" y="480" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-50" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-42" target="E50cbukwqj_svzYrhz0v-47">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="390" y="1470" as="sourcePoint" />
+            <mxPoint x="430" y="1560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-57" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-33" target="E50cbukwqj_svzYrhz0v-56">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-58" value="Real Open Trades" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" vertex="1" parent="1">
+          <mxGeometry x="452" y="1405" width="140" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="E50cbukwqj_svzYrhz0v-59" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="E50cbukwqj_svzYrhz0v-46" target="E50cbukwqj_svzYrhz0v-58">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

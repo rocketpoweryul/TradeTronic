@@ -13,7 +13,9 @@ from TATools          import *
 from GUI              import *
 
 # perform daily maintenance on data stored to disk
-update_useq = True
+#update_useq = True
+#update_RS   = True
+update_useq = False
 update_RS   = False
 
 # clear terminal
@@ -46,6 +48,8 @@ if __name__ == '__main__':
     df = calculate_adr(df)
     df = calculate_up_down_ratio(df)
     df = add_base_count(df)
+    df = add_beta(df)
+    df = add_obv(df)
 
     # Convert index to integers, but save dates as datestrings 
     df['DateString'] = df.index.strftime('%Y-%m-%d')  # Save date info before resetting index

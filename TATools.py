@@ -6,7 +6,7 @@ import concurrent.futures
 from scipy.stats import rankdata
 
 # internal modules
-from    NorgateInterface import *
+from NorgateInterface import *
 
 def find_swing_high_and_lows(df):
     """
@@ -177,7 +177,7 @@ def filter_peaks(df):
     
     return df
 
-def detect_consolidation(df, consol_min_bars=20, consol_mindepth_pct=5, consol_maxdepth_pct=35):
+def detect_consolidation(df, consol_min_bars=20, consol_mindepth_pct=5, consol_maxdepth_pct=40):
     """
     Analyze the entire stock history to detect consolidation phases and append the DataFrame with new columns.
     
@@ -894,5 +894,69 @@ def add_base_count(df):
 
     # Add BaseCount column to the DataFrame
     df['BaseCount'] = base_counts
+
+    return df
+
+def add_beta(df, benchmark_symbol='$SPX', window=20, interval='D'):
+    """
+    Adds a rolling beta to the given stock's dataframe, calculated over a specified window.
+
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing the stock's OHLCV data with a 'Close' column.
+        benchmark_symbol (str): The symbol for the benchmark index (e.g., '$SPX').
+        window (int): The rolling window size for calculating beta (e.g., 20 days for monthly beta).
+        interval (str): Data interval (e.g., 'D' for daily).
+
+    Returns:
+        pandas.DataFrame: The original DataFrame with an additional 'Rolling_Beta' column.
+    """
+    # Fetch OHLCV data for the benchmark
+    benchmark_data = fetch_OHLCV(benchmark_symbol, num_bars=len(df), interval=interval)
+
+    # Calculate daily returns for stock and benchmark
+    df['Returns'] = df['Close'].pct_change()
+    benchmark_data['Returns'] = benchmark_data['Close'].pct_change()
+
+    # Drop NaN values resulting from pct_change()
+    df.dropna(subset=['Returns'], inplace=True)
+    benchmark_data.dropna(subset=['Returns'], inplace=True)
+
+    # Align data on dates by merging on index
+    combined_data = pd.merge(df[['Returns']], benchmark_data[['Returns']], left_index=True, right_index=True, suffixes=('_stock', '_benchmark'))
+
+    # Calculate rolling beta over the specified window
+    rolling_covariance = combined_data['Returns_stock'].rolling(window).cov(combined_data['Returns_benchmark'])
+    rolling_variance = combined_data['Returns_benchmark'].rolling(window).var()
+    combined_data['Beta'] = rolling_covariance / rolling_variance
+
+    # Merge the rolling beta back into the original stock dataframe
+    df = df.join(combined_data['Beta'], how='left')
+
+    return df
+
+def add_obv(df):
+    """
+    Adds On-Balance Volume (OBV) to the given stock's dataframe.
+
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing the stock's OHLCV data with 'Close' and 'Volume' columns.
+
+    Returns:
+        pandas.DataFrame: The original DataFrame with an additional 'OBV' column.
+    """
+    # Initialize OBV column
+    df['OBV'] = 0
+
+    # Calculate OBV based on daily price movement
+    for i in range(1, len(df)):
+        if df['Close'].iloc[i] > df['Close'].iloc[i - 1]:
+            # Add volume if the current close is higher than the previous close
+            df['OBV'].iloc[i] = df['OBV'].iloc[i - 1] + df['Volume'].iloc[i]
+        elif df['Close'].iloc[i] < df['Close'].iloc[i - 1]:
+            # Subtract volume if the current close is lower than the previous close
+            df['OBV'].iloc[i] = df['OBV'].iloc[i - 1] - df['Volume'].iloc[i]
+        else:
+            # OBV remains the same if the close price hasn't changed
+            df['OBV'].iloc[i] = df['OBV'].iloc[i - 1]
 
     return df
